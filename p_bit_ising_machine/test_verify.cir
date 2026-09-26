@@ -1,0 +1,15 @@
+* 4-p-Bit Ising Core
+.include ising_4pbit_core.cir
+.control
+  run
+  meas tran o1 find v(m_out1) at=1m
+  meas tran o2 find v(m_out2) at=1m
+  meas tran o3 find v(m_out3) at=1m
+  meas tran o4 find v(m_out4) at=1m
+  echo FINAL_OUTPUTS_AT_1MS:
+  echo   P1 m_out1 = \$#o1
+  echo   P2 m_out2 = \$#o2
+  echo   P3 m_out3 = \$#o3
+  echo   P4 m_out4 = \$#o4
+  quit
+.endc

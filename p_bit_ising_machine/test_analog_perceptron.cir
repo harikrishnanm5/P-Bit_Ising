@@ -1,0 +1,54 @@
+* Analog Perceptron (AND Gate) Simulation Netlist
+* AI Hardware: Analog Perceptron - SDG 4
+* Inputs: 0V / 1V logic levels
+* Two inputs (A, B) + Bias term (-1.5V)
+* Weighted Summing Amplifier Stage + Comparator Activation Function
+
+* Power Supplies
+Vcc vcc 0 DC 5
+Vee vee 0 DC -5
+Vbias vbias 0 DC -1.5
+
+* Input Signal A: 0V for first 20ms, 1V for next 20ms (Period = 40ms)
+VA in_a 0 PULSE(0 1 20m 1u 1u 20m 40m)
+
+* Input Signal B: 0V for 10ms, 1V for 10ms (Period = 20ms)
+VB in_b 0 PULSE(0 1 10m 1u 1u 10m 20m)
+
+* --- STAGE 1: WEIGHTED SUMMING AMPLIFIER ---
+* Inverting Summing Amp: V_sum = -(Rf/R1*Va + Rf/R2*Vb + Rf/Rb*Vbias) = -(Va + Vb - 1.5)
+* For (0,0): V_sum = -(-1.5) = +1.5V
+* For (0,1): V_sum = -(1 - 1.5) = +0.5V
+* For (1,0): V_sum = -(1 - 1.5) = +0.5V
+* For (1,1): V_sum = -(2 - 1.5) = -0.5V
+R1 in_a sum_node 10k
+R2 in_b sum_node 10k
+Rb vbias sum_node 10k
+Rf sum_node v_sum 10k
+
+* Op-Amp 1 (Summing Stage)
+Xop1 0 sum_node vcc vee v_sum OPAMP_MACRO
+
+* --- STAGE 2: COMPARATOR (ACTIVATION FUNCTION: STEP / HEAVISIDE) ---
+* Compares 0V against v_sum: non_inv = 0, inv = v_sum
+* When V_sum < 0V (i.e. (1,1)), (0 - V_sum) > 0 -> Out swings to +5V (HIGH)
+* When V_sum > 0V (i.e. (0,0), (0,1), (1,0)), (0 - V_sum) < 0 -> Out swings to 0V (LOW)
+Xcomp 0 v_sum vcc 0 v_out OPAMP_MACRO
+
+* Op-Amp Behavioral Macro-model with saturation limits
+.subckt OPAMP_MACRO non_inv inv pos_rail neg_rail out
+Rin non_inv inv 10Meg
+B_gain internal 0 V = max(V(neg_rail), min(V(pos_rail), 1e5 * (V(non_inv) - V(inv))))
+Rout internal out 50
+.ends OPAMP_MACRO
+
+* Transient Simulation: 0 to 40ms
+.tran 10u 40m 0 10u
+
+.control
+run
+wrdata test_perceptron_data.txt V(in_a) V(in_b) V(v_sum) V(v_out)
+quit
+.endc
+
+.end

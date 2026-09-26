@@ -1,58 +1,139 @@
-* 4-p-Bit Reconfigurable Ising Optimization Core
-.title 4-p-Bit Reconfigurable Ising Optimization Core
+* ==============================================================================
+* 4-p-Bit Reconfigurable Transistor-Level Ising Optimization Core
+* Standardized 180nm CMOS with CMOS Transmission-Gate Coupling Network
+* ==============================================================================
 
-* Power Supply & Mode Selection (5V = 4-p-bit mode, 0V = 2-p-bit mode)
-Vdd vdd 0 DC 5V
-Vmode mode 0 DC 5V
+.title 4-p-Bit Reconfigurable CMOS Ising Optimization Core
 
-* Noise Sources (Multi-Tone Asynchronous Quasi-Random Generators)
-Vn1 n1 0 SFFM(0 1.5 35k 1.8 9k)
-Vn2 n2 0 SFFM(0 1.5 43k 1.6 13k)
-Vn3 n3 0 SFFM(0 1.5 27k 1.4 7k)
-Vn4 n4 0 SFFM(0 1.5 51k 1.9 17k)
+* ------------------------------------------------------------------------------
+* Power Supply & Mode Control
+* MODE = 1.8V (or 5V): 4-p-bit Mode (All 5 edges active)
+* MODE = 0.0V:        2-p-bit Mode (Only P1-P2 active, P3 & P4 isolated)
+* ------------------------------------------------------------------------------
+Vdd vdd 0 DC 1.8V
+Vmode mode 0 DC 1.8V
 
-* Normalized Spin Definitions: s_i = (V(out_i) - 2.5) / 2.5 in [-1, +1]
-* Enable Logic for P3 and P4:
-Ben34 en34 0 V = if(V(mode) > 2.5, 1, 0)
+* Complementary MODE Generation (Inverter)
+MP_INV mode_bar mode vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN_INV mode_bar mode 0   0   NMOS_PBIT W=1.0u L=0.18u
 
-* Synaptic Summing Junctions (Inhibitory / Antiferromagnetic Coupling)
-* Graph: (1,2), (1,3), (2,3), (2,4), (3,4) - No (1,4)
-Bsum1 sum1 0 V = V(n1) - ((V(out2)-2.5)/2.5) - V(en34)*((V(out3)-2.5)/2.5)
-Bsum2 sum2 0 V = V(n2) - ((V(out1)-2.5)/2.5) - V(en34)*((V(out3)-2.5)/2.5) - V(en34)*((V(out4)-2.5)/2.5)
-Bsum3 sum3 0 V = V(en34) * (V(n3) - ((V(out1)-2.5)/2.5) - ((V(out2)-2.5)/2.5) - ((V(out4)-2.5)/2.5))
-Bsum4 sum4 0 V = V(en34) * (V(n4) - ((V(out2)-2.5)/2.5) - ((V(out3)-2.5)/2.5))
+* ------------------------------------------------------------------------------
+* CMOS 180nm Calibrated Transistor Models
+* ------------------------------------------------------------------------------
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 
-* Nonlinear Activation / Slicing Stage
-Braw1 raw1 0 V = if(V(sum1) > 0, 5, 0)
-Braw2 raw2 0 V = if(V(sum2) > 0, 5, 0)
-Braw3 raw3 0 V = if(V(en34) > 0.5, if(V(sum3) > 0, 5, 0), 0)
-Braw4 raw4 0 V = if(V(en34) > 0.5, if(V(sum4) > 0, 5, 0), 0)
+* ------------------------------------------------------------------------------
+* DC Mid-Rail Operating Point Biases (Vth_actual = 0.90V)
+* ------------------------------------------------------------------------------
+Vbias1 in1 0 DC 0.90V
+Vbias2 in2 0 DC 0.90V
+Vbias3 in3 0 DC 0.90V
+Vbias4 in4 0 DC 0.90V
 
-* RC Low-Pass Dynamics (Breaks Algebraic Loops & Simulates Physical Slew)
-R1 raw1 out1 1k
-C1 out1 0 10n
+* ------------------------------------------------------------------------------
+* Independent Quasi-Random / Dither Noise Sources (P1 - P4)
+* ------------------------------------------------------------------------------
+Vnoise1 noise1 in1 SIN(0 40m 5.0k 0 0)
+Vnoise2 noise2 in2 SIN(0 40m 7.1k 0 0)
+Vnoise3 noise3 in3 SIN(0 40m 11.3k 0 0)
+Vnoise4 noise4 in4 SIN(0 40m 13.7k 0 0)
 
-R2 raw2 out2 1k
-C2 out2 0 10n
+* ==============================================================================
+* Four Discrete CMOS Probabilistic Bit (p-bit) Cells: P1 - P4
+* ==============================================================================
 
-R3 raw3 out3 1k
-C3 out3 0 10n
+* --- p-Bit Cell P1 ---
+MP1 a1 noise1 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 a1 noise1 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb1 noise1 a1 500k
+C1 a1 0 15fF
+MP_BUF1 m_out1 a1 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF1 m_out1 a1 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout1 m_out1 0 20fF
 
-R4 raw4 out4 1k
-C4 out4 0 10n
+* --- p-Bit Cell P2 ---
+MP2 a2 noise2 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN2 a2 noise2 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb2 noise2 a2 500k
+C2 a2 0 15fF
+MP_BUF2 m_out2 a2 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF2 m_out2 a2 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout2 m_out2 0 20fF
 
-* Real-Time Energy / Hamiltonian Metric: H = -sum(J_ij * s_i * s_j)
-* In MAX-CUT, lower energy = more satisfied cut edges
-Benergy energy 0 V = ((V(out1)-2.5)*(V(out2)-2.5) + V(en34)*(V(out1)-2.5)*(V(out3)-2.5) + V(en34)*(V(out2)-2.5)*(V(out3)-2.5) + V(en34)*(V(out2)-2.5)*(V(out4)-2.5) + V(en34)*(V(out3)-2.5)*(V(out4)-2.5)) / 6.25
+* --- p-Bit Cell P3 ---
+MP3 a3 noise3 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN3 a3 noise3 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb3 noise3 a3 500k
+C3 a3 0 15fF
+MP_BUF3 m_out3 a3 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF3 m_out3 a3 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout3 m_out3 0 20fF
 
-.tran 100n 200u
+* --- p-Bit Cell P4 ---
+MP4 a4 noise4 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN4 a4 noise4 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb4 noise4 a4 500k
+C4 a4 0 15fF
+MP_BUF4 m_out4 a4 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF4 m_out4 a4 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout4 m_out4 0 20fF
+
+* ==============================================================================
+* 5-Edge MAX-CUT Reconfigurable Coupling Network (Symmetric Inhibitory Feedback)
+* ==============================================================================
+
+* Edge 1: P1 - P2 (Permanent / Always Active Edge)
+R_c12 a1 noise2 500k
+R_c21 a2 noise1 500k
+
+* Edge 2: P1 - P3 (Switchable via CMOS Transmission Gates)
+R_c13 a1 tg_13 500k
+MN_TG13 tg_13 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG13 tg_13 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
+
+R_c31 a3 tg_31 500k
+MN_TG31 tg_31 mode noise1 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG31 tg_31 mode_bar noise1 vdd PMOS_PBIT W=2.5u L=0.18u
+
+* Edge 3: P2 - P3 (Switchable via CMOS Transmission Gates)
+R_c23 a2 tg_23 500k
+MN_TG23 tg_23 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG23 tg_23 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
+
+R_c32 a3 tg_32 500k
+MN_TG32 tg_32 mode noise2 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG32 tg_32 mode_bar noise2 vdd PMOS_PBIT W=2.5u L=0.18u
+
+* Edge 4: P2 - P4 (Switchable via CMOS Transmission Gates)
+R_c24 a2 tg_24 500k
+MN_TG24 tg_24 mode noise4 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG24 tg_24 mode_bar noise4 vdd PMOS_PBIT W=2.5u L=0.18u
+
+R_c42 a4 tg_42 500k
+MN_TG42 tg_42 mode noise2 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG42 tg_42 mode_bar noise2 vdd PMOS_PBIT W=2.5u L=0.18u
+
+* Edge 5: P3 - P4 (Switchable via CMOS Transmission Gates)
+R_c34 a3 tg_34 500k
+MN_TG34 tg_34 mode noise4 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG34 tg_34 mode_bar noise4 vdd PMOS_PBIT W=2.5u L=0.18u
+
+R_c43 a4 tg_43 500k
+MN_TG43 tg_43 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG43 tg_43 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
+
+* ==============================================================================
+* Transient Analysis & Simulation Control
+* ==============================================================================
+.tran 100n 1m
 
 .control
   run
   set color0=white
   set color1=black
-  plot v(out1) v(out2) v(out3) v(out4) title '4-p-Bit Reconfigurable Ising Core: Convergence to MAX-CUT Ground State'
-  plot v(energy) title 'Ising Hamiltonian Energy Minimization Trajectory'
+  plot v(m_out1) v(m_out2) v(m_out3) v(m_out4) title '4-p-Bit Ising Core: Digital Output Spins'
+  plot v(a1) v(a2) v(a3) v(a4) title '4-p-Bit Ising Core: Analog Metastable Potentials'
 .endc
 
 .end
