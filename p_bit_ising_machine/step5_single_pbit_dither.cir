@@ -1,0 +1,42 @@
+* ==============================================================================
+* Step 5: Single p-Bit Core with Sinusoidal/Noise Threshold Dithering
+* Reuses the same MP1/MN1 + MP_BUF/MN_BUF Inverter Cell from the Perceptron
+* ==============================================================================
+
+.title Single p-Bit Stochastic Dither Core
+
+* Power Supply
+Vdd vdd 0 DC 1.8V
+
+* DC Synaptic Bias set exactly at Vth_actual = 0.90V
+Vin in_node 0 DC 0.90V
+
+* 5 kHz / 40mV Sinusoidal Noise Dither (Dithers around metastable point)
+Vdither noise_node in_node SIN(0 40m 5k 0 0)
+
+* CMOS Transistor Models
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* Stage 1: Noise-Amplifying Inverter (with 200k Self-Biasing Feedback)
+MP1 analog_out noise_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 analog_out noise_node 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb noise_node analog_out 200k
+C1 analog_out 0 15fF
+
+* Stage 2: Digital Restoring Buffer
+MP_BUF m_out analog_out vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF m_out analog_out 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout m_out 0 20fF
+
+* 1ms Transient Simulation (5 full periods of 5kHz dither)
+.tran 100n 1m
+
+.control
+  run
+  set color0=white
+  set color1=black
+  plot v(noise_node) v(analog_out) v(m_out) title 'Single p-Bit: Threshold Dithering & Rail-to-Rail Stochastic Toggling'
+.endc
+
+.end

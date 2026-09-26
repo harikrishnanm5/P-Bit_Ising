@@ -1,0 +1,48 @@
+* ==============================================================================
+* CMOS Probabilistic Bit (p-bit) Processing Element
+* Standardized 180nm CMOS with Native Gaussian Thermal Noise & Metastable Feedback
+* ==============================================================================
+
+.title CMOS Probabilistic Bit (p-bit) Processing Element
+
+* Power Supply & DC Synaptic Input Bias
+Vdd vdd 0 DC 1.8V
+Vin in_node 0 DC 0.9V
+
+* Native Gaussian Thermal Noise Injection (Ngspice trnoise)
+Vnoise noise_node in_node trnoise(35m 0.2n 0 0)
+
+* ==============================================================================
+* CMOS Transistor Models (Calibrated 180nm CMOS)
+* ==============================================================================
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* ==============================================================================
+* Stage 1: High-Gain Metastable Noise Amplifier
+* ==============================================================================
+MP1 analog_out noise_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 analog_out noise_node 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb noise_node analog_out 200k
+C1 analog_out 0 15fF
+
+* ==============================================================================
+* Stage 2: Digital Restoring Buffer (Inverter)
+* ==============================================================================
+MP_BUF m_out analog_out vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF m_out analog_out 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout m_out 0 20fF
+
+* ==============================================================================
+* Transient Simulation
+* ==============================================================================
+.tran 0.1n 100n
+
+.control
+  run
+  set color0=white
+  set color1=black
+  plot v(in_node) v(analog_out) v(m_out) title 'Stochastic p-bit Fluctuation & Digital Spin Output'
+.endc
+
+.end

@@ -1,0 +1,12 @@
+version=1
+last_client=kicad
+[general]
+version=1
+RootSch=p_bit_ising.sch
+BoardNm=
+[pcbnew]
+version=1
+[cvpcb]
+version=1
+[eeschema]
+version=1

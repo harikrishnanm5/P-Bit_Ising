@@ -1,0 +1,52 @@
+* CMOS Silicon PUF (Physically Unclonable Function) Netlist
+* Compatible with Ngspice / eSim
+
+.title CMOS Silicon PUF Simulation with Process Variation
+
+* ==========================================
+* Power Supplies and Control Signals
+* ==========================================
+Vdd vdd 0 DC 1.8V
+* Enable signal: starts at 1.8V (OFF) and drops to 0V (ON) at 10ns with 1ns fall time
+Ven en 0 PULSE(1.8 0 10n 1n 1n 100n 200n)
+
+* ==========================================
+* CMOS Transistor Level 1 Models (or Sky130)
+* ==========================================
+.model NMOS_PUF NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PUF PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* ==========================================
+* Power Gating PMOS Switch
+* ==========================================
+* M_EN: Drain=v_core, Gate=en, Source=vdd, Body=vdd
+M_EN v_core en vdd vdd PMOS_PUF W=4u L=0.18u
+
+* ==========================================
+* Cross-Coupled Inverter Pair (PUF Core)
+* ==========================================
+* Inverter 1: Output Q, Input Q_bar
+MP1 Q Q_bar v_core v_core PMOS_PUF W=2u L=0.18u
+MN1 Q Q_bar 0      0      NMOS_PUF W=1u L=0.18u
+
+* Inverter 2: Output Q_bar, Input Q
+MP2 Q_bar Q v_core v_core PMOS_PUF W=2u L=0.18u
+MN2 Q_bar Q 0      0      NMOS_PUF W=1u L=0.18u
+
+* Load Capacitances (parasitics)
+C1 Q 0 10fF
+C2 Q_bar 0 10fF
+
+* ==========================================
+* Simulation Control Directives
+* ==========================================
+.tran 0.1n 60n
+
+.control
+  run
+  set color0=white
+  set color1=black
+  plot v(en) v(Q) v(Q_bar) title 'CMOS Silicon PUF Start-up & Metastability Resolution'
+.endc
+
+.end

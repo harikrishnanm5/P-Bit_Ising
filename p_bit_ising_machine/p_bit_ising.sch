@@ -1,0 +1,309 @@
+EESchema Schematic File Version 4
+LIBS:p_bit_ising-cache
+LIBS:Device
+LIBS:power
+LIBS:Simulation_SPICE
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title "CMOS Probabilistic Bit (p-bit) Processing Element"
+Date "2026-09-26"
+Rev "2.0"
+Comp "eSim Hackathon - Stochastic Hardware Architecture"
+Comment1 "Core Processing Element for Stochastic Ising Computing"
+Comment2 "High-Gain Metastable Amplifier (L=0.35u) + Restoring Buffer (L=0.18u)"
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L p_bit_ising-cache:VDC Vdd
+U 1 1 65000001
+P 1200 2500
+F 0 "Vdd" H 700 2400 50  0001 R CNN
+F 1 "1.8V" H 700 2600 50  0001 R CNN
+F 2 "" H 1200 2500 50  0001 C CNN
+F 3 "" H 1200 2500 50  0001 C CNN
+	1    1200 2500
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:VDD #PWR01
+U 1 1 65000002
+P 1200 2100
+F 0 "#PWR01" H 1200 2000 30  0001 C CNN
+F 1 "VDD (1.8V)" H 1200 1900 50  0000 C CNN
+F 2 "" H 1200 2100 50  0001 C CNN
+F 3 "" H 1200 2100 50  0001 C CNN
+	1    1200 2100
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR02
+U 1 1 65000003
+P 1200 3000
+F 0 "#PWR02" H 1200 3100 30  0001 C CNN
+F 1 "GND" H 1200 3200 50  0000 C CNN
+F 2 "" H 1200 3000 50  0001 C CNN
+F 3 "" H 1200 3000 50  0001 C CNN
+	1    1200 3000
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:VDC Vin
+U 1 1 65000004
+P 2200 3500
+F 0 "Vin" H 1700 3400 50  0001 R CNN
+F 1 "0.9V (Bias)" H 1700 3600 50  0001 R CNN
+F 2 "" H 2200 3500 50  0001 C CNN
+F 3 "" H 2200 3500 50  0001 C CNN
+	1    2200 3500
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:VPULSE Vnoise
+U 1 1 65000005
+P 3200 3500
+F 0 "Vnoise" H 3200 3050 50  0000 C CNN
+F 1 "Thermal Noise" H 3200 3200 50  0000 C CNN
+F 2 "" H 3200 3500 50  0001 C CNN
+F 3 "" H 3200 3500 50  0001 C CNN
+	1    3200 3500
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR03
+U 1 1 65000006
+P 2200 4200
+F 0 "#PWR03" H 2200 4300 30  0001 C CNN
+F 1 "GND" H 2200 4400 50  0000 C CNN
+F 2 "" H 2200 4200 50  0001 C CNN
+F 3 "" H 2200 4200 50  0001 C CNN
+	1    2200 4200
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:R Rfb
+U 1 1 65000007
+P 5000 2000
+F 0 "Rfb" H 5000 1700 50  0000 C CNN
+F 1 "200k (Feedback)" H 5000 1850 50  0000 C CNN
+F 2 "" H 5000 2000 50  0001 C CNN
+F 3 "" H 5000 2000 50  0001 C CNN
+	1    5000 2000
+	0    1    -1   0
+$EndComp
+$Comp
+L p_bit_ising-cache:Q_PMOS_GDS MP1
+U 1 1 65000008
+P 5000 2800
+F 0 "MP1" H 5300 2700 50  0000 L CNN
+F 1 "W=2.5u L=0.35u" H 5300 2900 50  0000 L CNN
+F 2 "" H 5000 2800 50  0001 C CNN
+F 3 "" H 5000 2800 50  0001 C CNN
+	1    5000 2800
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:Q_NMOS_GDS MN1
+U 1 1 65000009
+P 5000 4500
+F 0 "MN1" H 5300 4400 50  0000 L CNN
+F 1 "W=1.0u L=0.35u" H 5300 4600 50  0000 L CNN
+F 2 "" H 5000 4500 50  0001 C CNN
+F 3 "" H 5000 4500 50  0001 C CNN
+	1    5000 4500
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:VDD #PWR04
+U 1 1 65000010
+P 5100 2200
+F 0 "#PWR04" H 5100 2100 30  0001 C CNN
+F 1 "VDD" H 5100 2000 50  0000 C CNN
+F 2 "" H 5100 2200 50  0001 C CNN
+F 3 "" H 5100 2200 50  0001 C CNN
+	1    5100 2200
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR05
+U 1 1 65000011
+P 5100 5200
+F 0 "#PWR05" H 5100 5300 30  0001 C CNN
+F 1 "GND" H 5100 5400 50  0000 C CNN
+F 2 "" H 5100 5200 50  0001 C CNN
+F 3 "" H 5100 5200 50  0001 C CNN
+	1    5100 5200
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:C C1
+U 1 1 65000012
+P 5800 4100
+F 0 "C1" H 6100 4050 50  0000 L CNN
+F 1 "15fF" H 6100 4200 50  0000 L CNN
+F 2 "" H 5800 4100 50  0001 C CNN
+F 3 "" H 5800 4100 50  0001 C CNN
+	1    5800 4100
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR06
+U 1 1 65000013
+P 5800 4700
+F 0 "#PWR06" H 5800 4800 30  0001 C CNN
+F 1 "GND" H 5800 4900 50  0000 C CNN
+F 2 "" H 5800 4700 50  0001 C CNN
+F 3 "" H 5800 4700 50  0001 C CNN
+	1    5800 4700
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:Q_PMOS_GDS MP_BUF
+U 1 1 65000014
+P 7000 2800
+F 0 "MP_BUF" H 7300 2700 50  0000 L CNN
+F 1 "W=3.0u L=0.18u" H 7300 2900 50  0000 L CNN
+F 2 "" H 7000 2800 50  0001 C CNN
+F 3 "" H 7000 2800 50  0001 C CNN
+	1    7000 2800
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:Q_NMOS_GDS MN_BUF
+U 1 1 65000015
+P 7000 4500
+F 0 "MN_BUF" H 7300 4400 50  0000 L CNN
+F 1 "W=1.5u L=0.18u" H 7300 4600 50  0000 L CNN
+F 2 "" H 7000 4500 50  0001 C CNN
+F 3 "" H 7000 4500 50  0001 C CNN
+	1    7000 4500
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:VDD #PWR07
+U 1 1 65000016
+P 7100 2200
+F 0 "#PWR07" H 7100 2100 30  0001 C CNN
+F 1 "VDD" H 7100 2000 50  0000 C CNN
+F 2 "" H 7100 2200 50  0001 C CNN
+F 3 "" H 7100 2200 50  0001 C CNN
+	1    7100 2200
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR08
+U 1 1 65000017
+P 7100 5200
+F 0 "#PWR08" H 7100 5300 30  0001 C CNN
+F 1 "GND" H 7100 5400 50  0000 C CNN
+F 2 "" H 7100 5200 50  0001 C CNN
+F 3 "" H 7100 5200 50  0001 C CNN
+	1    7100 5200
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:C Cout
+U 1 1 65000018
+P 7900 4100
+F 0 "Cout" H 8200 4050 50  0000 L CNN
+F 1 "20fF" H 8200 4200 50  0000 L CNN
+F 2 "" H 7900 4100 50  0001 C CNN
+F 3 "" H 7900 4100 50  0001 C CNN
+	1    7900 4100
+	1    0    0    -1
+$EndComp
+$Comp
+L p_bit_ising-cache:GND #PWR09
+U 1 1 65000019
+P 7900 4700
+F 0 "#PWR09" H 7900 4800 30  0001 C CNN
+F 1 "GND" H 7900 4900 50  0000 C CNN
+F 2 "" H 7900 4700 50  0001 C CNN
+F 3 "" H 7900 4700 50  0001 C CNN
+	1    7900 4700
+	1    0    0    -1
+$EndComp
+Wire Wire Line
+	1200 2100 1200 2300
+Wire Wire Line
+	1200 2700 1200 3000
+Wire Wire Line
+	2200 3700 2200 4200
+Wire Wire Line
+	2200 3300 2200 2800
+Wire Wire Line
+	2200 2800 3200 2800
+Wire Wire Line
+	3200 2800 3200 3300
+Wire Wire Line
+	3200 3700 4300 3700
+Wire Wire Line
+	4300 3700 4300 2000
+Wire Wire Line
+	4300 2000 4850 2000
+Wire Wire Line
+	4300 3700 4300 2800
+Wire Wire Line
+	4300 2800 4800 2800
+Wire Wire Line
+	4300 3700 4300 4500
+Wire Wire Line
+	4300 4500 4800 4500
+Wire Wire Line
+	5100 2200 5100 2600
+Wire Wire Line
+	5100 3000 5100 3700
+Wire Wire Line
+	5100 3700 5100 4300
+Wire Wire Line
+	5100 4700 5100 5200
+Wire Wire Line
+	5150 2000 5500 2000
+Wire Wire Line
+	5500 2000 5500 3700
+Wire Wire Line
+	5100 3700 5500 3700
+Wire Wire Line
+	5500 3700 5800 3700
+Wire Wire Line
+	5800 3700 5800 3950
+Wire Wire Line
+	5800 4250 5800 4700
+Wire Wire Line
+	5800 3700 6400 3700
+Wire Wire Line
+	6400 3700 6400 2800
+Wire Wire Line
+	6400 2800 6800 2800
+Wire Wire Line
+	6400 3700 6400 4500
+Wire Wire Line
+	6400 4500 6800 4500
+Wire Wire Line
+	7100 2200 7100 2600
+Wire Wire Line
+	7100 3000 7100 3700
+Wire Wire Line
+	7100 3700 7100 4300
+Wire Wire Line
+	7100 4700 7100 5200
+Wire Wire Line
+	7100 3700 7900 3700
+Wire Wire Line
+	7900 3700 7900 3950
+Wire Wire Line
+	7900 4250 7900 4700
+Wire Wire Line
+	7900 3700 8700 3700
+Text Label 2700 2750 0    60   ~ 0
+in_node
+Text Label 3800 3650 0    60   ~ 0
+noise_node
+Text Label 5300 3650 0    60   ~ 0
+analog_out
+Text Label 8500 3650 0    60   ~ 0
+m_out
+$EndSCHEMATC

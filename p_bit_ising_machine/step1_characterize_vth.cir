@@ -1,0 +1,32 @@
+* Step 1: Characterize Inverter Threshold (Vth_actual)
+.title Inverter DC Threshold Characterization
+
+Vdd vdd 0 DC 1.8V
+Vin in_node 0 DC 0.9V
+
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* Stage 1: Inverter (MP1, MN1)
+MP1 analog_out in_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 analog_out in_node 0   0   NMOS_PBIT W=1.0u L=0.18u
+
+* Stage 2: Buffer (MP_BUF, MN_BUF)
+MP_BUF m_out analog_out vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF m_out analog_out 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout m_out 0 20fF
+
+.dc Vin 0 1.8 0.005
+
+.control
+  run
+  meas dc vth_stage1 when v(analog_out)=0.9
+  meas dc vth_final when v(m_out)=0.9
+  echo "=========================================================="
+  echo " MEASURED INVERTER THRESHOLD:"
+  echo " Stage 1 Trip Point (analog_out = 0.9V): " $&vth_stage1 " V"
+  echo " Overall Trip Point (m_out = 0.9V):      " $&vth_final " V"
+  echo "=========================================================="
+.endc
+
+.end

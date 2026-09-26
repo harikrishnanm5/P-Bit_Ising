@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name p_bit_ising-cache)(type Legacy)(uri ${KIPRJMOD}/p_bit_ising-cache.lib)(options "")(descr ""))
+)

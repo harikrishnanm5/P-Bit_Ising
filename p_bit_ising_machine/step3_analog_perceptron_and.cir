@@ -1,0 +1,51 @@
+* ==============================================================================
+* Step 3 & 4: Analog Perceptron AND Gate - Full 4ms Truth Table Verification
+* Inputs V1, V2 sequence through: [0,0] -> [0,1] -> [1,0] -> [1,1] (1ms per state)
+* ==============================================================================
+
+.title Analog Perceptron AND Gate Truth Table Verification
+
+* Power Supply
+Vdd vdd 0 DC 1.8V
+
+* Bias Voltage for AND decision boundary (Vb = 1.2V)
+Vb vb 0 DC 1.2V
+
+* Input Sequences (0 to 1.0V Logic Levels)
+* Window 1 (0 to 1ms): V1=0, V2=0 -> AND output = 0
+* Window 2 (1 to 2ms): V1=0, V2=1 -> AND output = 0
+* Window 3 (2 to 3ms): V1=1, V2=0 -> AND output = 0
+* Window 4 (3 to 4ms): V1=1, V2=1 -> AND output = 1 (1.8V)
+V1 v1_in 0 PWL(0 0 2m 0 2.001m 1.0 4m 1.0)
+V2 v2_in 0 PWL(0 0 1m 0 1.001m 1.0 2m 1.0 2.001m 0 3m 0 3.001m 1.0 4m 1.0)
+
+* 3-Resistor Passive Summing Junction (Vsum = (V1 + V2 + Vb) / 3)
+R1 v1_in sum_node 100k
+R2 v2_in sum_node 100k
+Rb vb    sum_node 100k
+
+* CMOS Transistor Models
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* Stage 1: High-Gain Inverter Threshold Slicer
+MP1 analog_out sum_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 analog_out sum_node 0   0   NMOS_PBIT W=1.0u L=0.18u
+C1 analog_out 0 15fF
+
+* Stage 2: Inverting Output Buffer (Restores Non-Inverting Logic: m_out = AND(V1, V2))
+MP_BUF m_out analog_out vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF m_out analog_out 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout m_out 0 20fF
+
+* 4ms Transient Simulation
+.tran 1u 4m
+
+.control
+  run
+  set color0=white
+  set color1=black
+  plot v(v1_in) v(v2_in) v(m_out) title 'Analog Perceptron AND Gate: 4ms Truth Table Verification (00->0, 01->0, 10->0, 11->1)'
+.endc
+
+.end

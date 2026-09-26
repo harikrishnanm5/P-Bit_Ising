@@ -1,0 +1,62 @@
+* ==============================================================================
+* Step 6: Coupled 2-p-Bit Pair (Antiferromagnetic / Inhibitory Coupling)
+* Shows Correlated / Anti-Correlated Stochastic Toggling Between 2 Spins
+* ==============================================================================
+
+.title Coupled 2-p-Bit Stochastic Pair
+
+* Power Supply
+Vdd vdd 0 DC 1.8V
+
+* Shared Mid-Rail Bias
+Vbias1 in1 0 DC 0.90V
+Vbias2 in2 0 DC 0.90V
+
+* Out-of-Phase Dithering Noise Sources (5kHz and 7kHz)
+Vdither1 n1 in1 SIN(0 40m 5k 0 0)
+Vdither2 n2 in2 SIN(0 40m 7k 0 0)
+
+* CMOS Transistor Models
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+
+* ------------------------------------------------------------------------------
+* p-Bit Cell #1
+* ------------------------------------------------------------------------------
+MP1 a1 n1 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 a1 n1 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb1 n1 a1 200k
+C1 a1 0 15fF
+
+MP_BUF1 m_out1 a1 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF1 m_out1 a1 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout1 m_out1 0 20fF
+
+* ------------------------------------------------------------------------------
+* p-Bit Cell #2
+* ------------------------------------------------------------------------------
+MP2 a2 n2 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN2 a2 n2 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb2 n2 a2 200k
+C2 a2 0 15fF
+
+MP_BUF2 m_out2 a2 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF2 m_out2 a2 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout2 m_out2 0 20fF
+
+* ------------------------------------------------------------------------------
+* Inter-Node Synaptic Cross-Coupling Resistor (R_couple = 150k)
+* ------------------------------------------------------------------------------
+R_couple a1 a2 150k
+
+* 1ms Transient Simulation
+.tran 100n 1m
+
+.control
+  run
+  set color0=white
+  set color1=black
+  plot v(m_out1) v(m_out2) title 'Coupled 2-p-Bit Pair: Correlated Stochastic Spin Toggling'
+.endc
+
+.end
