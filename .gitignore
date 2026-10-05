@@ -1,0 +1,38 @@
+# SPICE / Ngspice Simulation Outputs
+*.txt
+*.raw
+*.out
+*.log
+temp_*.cir
+temp_sim.cir
+temp_run.cir
+run_sim.cir
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+
+# KiCad / eSim temporary & backup files
+*.bak
+*-bak
+*.kicad_sch-bak
+*.kicad_prb
+*.net
+*.xml
+_autosave-*
+*.kicad_pcb-bak
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDEs
+.vscode/
+.idea/
