@@ -2,7 +2,7 @@
 .title 4-p-bit Ising Core
 
 Vdd vdd 0 DC 1.8V
-Vmode mode 0 DC 1.8V
+Vmode mode 0 DC 0.0V
 
 MP_INV mode_bar mode vdd vdd PMOS_PBIT W=2.5u L=0.18u
 MN_INV mode_bar mode 0   0   NMOS_PBIT W=1.0u L=0.18u
@@ -15,10 +15,15 @@ Vbias2 in2 0 DC 0.90V
 Vbias3 in3 0 DC 0.90V
 Vbias4 in4 0 DC 0.90V
 
-Vnoise1 noise1 in1 SIN(0 40m 5.0k 0 0)
-Vnoise2 noise2 in2 SIN(0 40m 7.1k 0 0)
-Vnoise3 noise3 in3 SIN(0 40m 11.3k 0 0)
-Vnoise4 noise4 in4 SIN(0 40m 13.7k 0 0)
+Vnoise1 dither1 in1 SIN(0 600m 5.0k 0 0)
+Vnoise2 dither2 in2 SIN(0 600m 7.1k 0 0)
+Vnoise3 dither3 in3 SIN(0 600m 11.3k 0 0)
+Vnoise4 dither4 in4 SIN(0 600m 13.7k 0 0)
+
+Rin1 dither1 noise1 500k
+Rin2 dither2 noise2 500k
+Rin3 dither3 noise3 500k
+Rin4 dither4 noise4 500k
 
 * P-bit 1
 MP1 a1 noise1 vdd vdd PMOS_PBIT W=2.5u L=0.18u
@@ -92,7 +97,7 @@ MP_TG43 tg_43 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
 
 .control
   run
-  wrdata mode_4pbit.txt v(m_out1) v(m_out2) v(m_out3) v(m_out4)
+  wrdata mode_2pbit.txt v(m_out1) v(m_out2) v(m_out3) v(m_out4)
   quit
 .endc
 .end

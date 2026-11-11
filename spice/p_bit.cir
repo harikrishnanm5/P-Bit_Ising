@@ -1,6 +1,6 @@
 * ==============================================================================
 * CMOS Probabilistic Bit (p-bit) Processing Element
-* Standardized 180nm CMOS with Native Gaussian Thermal Noise & Metastable Feedback
+* Standardized 180nm CMOS with Ngspice Gaussian Noise (trnoise) & Metastable Feedback
 * ==============================================================================
 
 .title CMOS Probabilistic Bit (p-bit) Processing Element
@@ -9,7 +9,7 @@
 Vdd vdd 0 DC 1.8V
 Vin in_node 0 DC 0.9V
 
-* Native Gaussian Thermal Noise Injection (Ngspice trnoise)
+* Pseudo-Random Gaussian Perturbation Emulating Thermal Noise (Ngspice trnoise)
 Vnoise noise_node in_node trnoise(35m 0.2n 0 0)
 
 * ==============================================================================

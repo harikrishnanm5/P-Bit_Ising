@@ -8,7 +8,7 @@
 Vdd vdd 0 DC 1.8V
 Vin in_node 0 DC 0.9V
 
-* Native Gaussian White Thermal Noise Injection
+* Pseudo-Random Gaussian Perturbation (Ngspice trnoise emulating thermal noise)
 Vnoise noise_node in_node trnoise(35m 0.2n 0 0)
 
 * CMOS Metastable Noise Amplifier (All L = 0.18u)
@@ -26,33 +26,33 @@ Cout m_out 0 20fF
 .model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 
 .control
-  let v_start = 0.70
-  let v_stop = 1.10
-  let v_step = 0.05
-  let n_points = 9
-  
-  dim vin_arr[9]
-  dim prob_arr[9]
-  
+  let v_start = 0.84
+  let v_stop = 0.965
+  let v_step = 0.01
+  let n_points = 13
+
+  let vin_arr = unitvec(13)
+  let prob_arr = unitvec(13)
+
   let idx = 0
   let v_cur = v_start
-  
+
   echo "========================================================================"
-  echo " EMPIRICAL SIGMOID VALIDATION: Sweeping Input Bias Vin (0.7V -> 1.1V)"
+  echo " EMPIRICAL SIGMOID VALIDATION: Sweeping Input Bias Vin (0.84V -> 0.96V)"
   echo "========================================================================"
   echo "  Vin (V)  |  Mean V(m_out) (V)  |  Empirical P(m = 1)  |  State Tendency"
   echo "-----------+---------------------+----------------------+----------------"
-  
+
   while v_cur <= v_stop
     alter Vin = v_cur
-    tran 0.1n 60n
-    
-    meas tran v_avg avg v(m_out) from=5n to=60n
+    tran 0.1n 200n
+
+    meas tran v_avg avg v(m_out) from=10n to=200n
     let p_one = v_avg / 1.8
-    
+
     let vin_arr[idx] = v_cur
     let prob_arr[idx] = p_one
-    
+
     if p_one < 0.2
       echo "   " $&v_cur "    |       " $&v_avg "       |        " $&p_one "        |  Dominant [ 0 ]"
     else
@@ -62,15 +62,15 @@ Cout m_out 0 20fF
         echo "   " $&v_cur "    |       " $&v_avg "       |        " $&p_one "        |  Stochastic [ 0/1 ]"
       end
     end
-    
+
     let idx = idx + 1
     let v_cur = v_cur + v_step
   end
-  
+
   echo "========================================================================"
   echo " Sigmoid verification completed successfully!"
   echo "========================================================================"
-  
+
   plot prob_arr vs vin_arr title 'Empirical p-bit Sigmoid Activation: P(m=1) vs Vin' xlabel 'Synaptic Input Bias Vin (V)' ylabel 'P(m=1)'
 .endc
 

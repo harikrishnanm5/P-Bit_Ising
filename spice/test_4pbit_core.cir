@@ -19,11 +19,16 @@ Vbias2 in2 0 DC 0.90V
 Vbias3 in3 0 DC 0.90V
 Vbias4 in4 0 DC 0.90V
 
-* Dither / Noise Sources
-Vnoise1 noise1 in1 SIN(0 40m 5.0k 0 0)
-Vnoise2 noise2 in2 SIN(0 40m 7.1k 0 0)
-Vnoise3 noise3 in3 SIN(0 40m 11.3k 0 0)
-Vnoise4 noise4 in4 SIN(0 40m 13.7k 0 0)
+* Quasi-Random Dither Sources (coupled through Rin = 500k summing resistors)
+Vnoise1 dither1 in1 SIN(0 600m 5.0k 0 0)
+Vnoise2 dither2 in2 SIN(0 600m 7.1k 0 0)
+Vnoise3 dither3 in3 SIN(0 600m 11.3k 0 0)
+Vnoise4 dither4 in4 SIN(0 600m 13.7k 0 0)
+
+Rin1 dither1 noise1 500k
+Rin2 dither2 noise2 500k
+Rin3 dither3 noise3 500k
+Rin4 dither4 noise4 500k
 
 * --- P-bit 1 ---
 MP1 a1 noise1 vdd vdd PMOS_PBIT W=2.5u L=0.18u

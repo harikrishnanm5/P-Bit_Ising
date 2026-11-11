@@ -12,9 +12,12 @@ Vdd vdd 0 DC 1.8V
 Vbias1 in1 0 DC 0.90V
 Vbias2 in2 0 DC 0.90V
 
-* Out-of-Phase Dithering Noise Sources (5kHz and 7kHz)
-Vdither1 n1 in1 SIN(0 40m 5k 0 0)
-Vdither2 n2 in2 SIN(0 40m 7k 0 0)
+* Out-of-Phase Quasi-Random Dithering Sources (5.0kHz and 7.1kHz)
+* Coupled via Rin = 500k so gates (n1, n2) act as true summing nodes
+Vdither1 d1 in1 SIN(0 500m 5.0k 0 0)
+Vdither2 d2 in2 SIN(0 500m 7.1k 0 0)
+Rin1 d1 n1 500k
+Rin2 d2 n2 500k
 
 * CMOS Transistor Models
 .model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
@@ -25,7 +28,7 @@ Vdither2 n2 in2 SIN(0 40m 7k 0 0)
 * ------------------------------------------------------------------------------
 MP1 a1 n1 vdd vdd PMOS_PBIT W=2.5u L=0.18u
 MN1 a1 n1 0   0   NMOS_PBIT W=1.0u L=0.18u
-Rfb1 n1 a1 200k
+Rfb1 n1 a1 500k
 C1 a1 0 15fF
 
 MP_BUF1 m_out1 a1 vdd vdd PMOS_PBIT W=3.0u L=0.18u
@@ -37,7 +40,7 @@ Cout1 m_out1 0 20fF
 * ------------------------------------------------------------------------------
 MP2 a2 n2 vdd vdd PMOS_PBIT W=2.5u L=0.18u
 MN2 a2 n2 0   0   NMOS_PBIT W=1.0u L=0.18u
-Rfb2 n2 a2 200k
+Rfb2 n2 a2 500k
 C2 a2 0 15fF
 
 MP_BUF2 m_out2 a2 vdd vdd PMOS_PBIT W=3.0u L=0.18u
@@ -45,9 +48,10 @@ MN_BUF2 m_out2 a2 0   0   NMOS_PBIT W=1.5u L=0.18u
 Cout2 m_out2 0 20fF
 
 * ------------------------------------------------------------------------------
-* Inter-Node Synaptic Cross-Coupling Resistor (R_couple = 150k)
+* Inter-Node Inhibitory Synaptic Cross-Coupling Resistors (R_c = 500k)
 * ------------------------------------------------------------------------------
-R_couple a1 a2 150k
+R_c12 a1 n2 500k
+R_c21 a2 n1 500k
 
 * 1ms Transient Simulation
 .tran 100n 1m
