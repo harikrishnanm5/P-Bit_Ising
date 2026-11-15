@@ -36,10 +36,10 @@ Vbias4 in4 0 DC 0.90V
 * Operating Point: 440mV RMS, 0.2ns step (Active Boltzmann Sampling Regime)
 * Coupled via Rin = 500k so gate nodes (noise1..4) act as true summing nodes
 * ------------------------------------------------------------------------------
-Vnoise1 dither1 in1 trnoise(440m 0.2n 0 0)
-Vnoise2 dither2 in2 trnoise(440m 0.2n 0 0)
-Vnoise3 dither3 in3 trnoise(440m 0.2n 0 0)
-Vnoise4 dither4 in4 trnoise(440m 0.2n 0 0)
+Vnoise1 dither1 in1 DC 0 trnoise(440m 0.2n 0 0)
+Vnoise2 dither2 in2 DC 0 trnoise(440m 0.2n 0 0)
+Vnoise3 dither3 in3 DC 0 trnoise(440m 0.2n 0 0)
+Vnoise4 dither4 in4 DC 0 trnoise(440m 0.2n 0 0)
 
 Rin1 dither1 noise1 500k
 Rin2 dither2 noise2 500k
@@ -131,17 +131,8 @@ MN_TG43 tg_43 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
 MP_TG43 tg_43 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
 
 * ==============================================================================
-* Transient Analysis & Simulation Control
+* Transient Analysis Specification
 * ==============================================================================
 .tran 0.5n 2u
-
-.control
-  set rndseed = 42
-  run
-  set color0=white
-  set color1=black
-  plot v(m_out1) v(m_out2) v(m_out3) v(m_out4) title '4-p-Bit Ising Core: Digital Output Spins'
-  plot v(a1) v(a2) v(a3) v(a4) title '4-p-Bit Ising Core: Analog Metastable Potentials'
-.endc
 
 .end

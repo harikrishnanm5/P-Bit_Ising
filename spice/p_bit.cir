@@ -1,29 +1,32 @@
 * ==============================================================================
 * CMOS Probabilistic Bit (p-bit) Processing Element
-* Standardized 180nm CMOS with Ngspice Gaussian Noise (trnoise) & Metastable Feedback
+* Standardized 180nm CMOS with Calibrated trnoise() & Balanced Rin/Rfb Network
 * ==============================================================================
 
 .title CMOS Probabilistic Bit (p-bit) Processing Element
 
 * Power Supply & DC Synaptic Input Bias
 Vdd vdd 0 DC 1.8V
-Vin in_node 0 DC 0.9V
+Vin in_node 0 DC 0.90V
 
-* Pseudo-Random Gaussian Perturbation Emulating Thermal Noise (Ngspice trnoise)
-Vnoise noise_node in_node trnoise(35m 0.2n 0 0)
+* Real Gaussian Thermal Noise Source (Calibrated 440mV RMS, 0.2ns step)
+Vnoise dither_node in_node DC 0 trnoise(440m 0.2n 0 0)
+
+* Series Input Summing Resistor (Matches Master Core Architecture)
+Rin dither_node noise_node 500k
 
 * ==============================================================================
-* CMOS Transistor Models (Calibrated 180nm CMOS)
+* CMOS Transistor Models (Calibrated 180nm CMOS Level-1)
 * ==============================================================================
 .model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 .model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 
 * ==============================================================================
-* Stage 1: High-Gain Metastable Noise Amplifier
+* Stage 1: High-Gain Metastable Noise Inverter
 * ==============================================================================
 MP1 analog_out noise_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
 MN1 analog_out noise_node 0   0   NMOS_PBIT W=1.0u L=0.18u
-Rfb noise_node analog_out 200k
+Rfb noise_node analog_out 500k
 C1 analog_out 0 15fF
 
 * ==============================================================================
@@ -36,13 +39,14 @@ Cout m_out 0 20fF
 * ==============================================================================
 * Transient Simulation
 * ==============================================================================
-.tran 0.1n 100n
+.tran 0.1n 300n
 
 .control
+  set rndseed = 42
   run
   set color0=white
   set color1=black
-  plot v(in_node) v(analog_out) v(m_out) title 'Stochastic p-bit Fluctuation & Digital Spin Output'
+  plot v(in_node) v(noise_node) v(analog_out) v(m_out) title 'Stochastic p-bit Fluctuation & Digital Spin Output'
 .endc
 
 .end

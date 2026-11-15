@@ -85,8 +85,11 @@ def run_ngspice_wrdata(netlist_text, signals, workdir, tag, seed=None):
     cir_path = os.path.join(workdir, f"{tag}.cir")
 
     idx = netlist_text.rfind(".control")
-    if idx == -1:
-        raise ValueError(f"No .control block found in {tag}")
+    if idx != -1:
+        base = netlist_text[:idx]
+    else:
+        end_idx = netlist_text.rfind(".end")
+        base = netlist_text[:end_idx] if end_idx != -1 else netlist_text
 
     seed_line = f"  set rndseed = {seed}\n" if seed is not None else ""
     ctrl = (
@@ -98,7 +101,7 @@ def run_ngspice_wrdata(netlist_text, signals, workdir, tag, seed=None):
         ".endc\n"
         ".end\n"
     )
-    patched = netlist_text[:idx] + ctrl
+    patched = base + ctrl
     with open(cir_path, "w") as f:
         f.write(patched)
 
@@ -108,11 +111,11 @@ def run_ngspice_wrdata(netlist_text, signals, workdir, tag, seed=None):
     return np.loadtxt(out_txt)
 
 
-def make_core_variant(base_netlist, amp=OPERATING_AMP, seed=None, init_spins=None, tstep="0.5n", tstop="1u", uic=False):
-    """Return a copy of ising_4pbit_core.cir with noise amplitude, random seed and optional .ic."""
+def make_core_variant(base_netlist, amp=OPERATING_AMP, init_spins=None, tstep="0.5n", tstop="1u", uic=False):
+    """Return a copy of ising_4pbit_core.cir with noise amplitude and optional initial spins."""
     text = re.sub(
-        r"Vnoise(\d)\s+dither\1\s+in\1\s+trnoise\([^\)]+\)",
-        rf"Vnoise\1 dither\1 in\1 trnoise({amp} 0.2n 0 0)",
+        r"Vnoise(\d)\s+dither\1\s+in\1\s+(DC\s+0\s+)?trnoise\([^\)]+\)",
+        rf"Vnoise\1 dither\1 in\1 DC 0 trnoise({amp} 0.2n 0 0)",
         base_netlist,
     )
     tran_line = f".tran {tstep} {tstop}" + (" uic" if uic else "")
@@ -130,28 +133,28 @@ def make_core_variant(base_netlist, amp=OPERATING_AMP, seed=None, init_spins=Non
 
 
 def generate_sigmoid_plot(spice_dir, results_dir, workdir):
-    print("[1/6] Simulating p-bit sigmoid response & single-cell fluctuation...")
+    print("[1/6] Simulating p-bit sigmoid response & single-cell fluctuation (exact core cell)...")
     with open(os.path.join(spice_dir, "p_bit_sigmoid_validation.cir")) as f:
         sig_base = f.read()
 
-    vins = np.round(np.arange(0.84, 0.965, 0.01), 3)
+    vins = np.round(np.arange(0.40, 1.45, 0.05), 3)
     probs = []
     for v in vins:
-        mod = sig_base.replace("Vin in_node 0 DC 0.9V", f"Vin in_node 0 DC {v:.3f}")
-        mod = re.sub(r"\.control[\s\S]*", ".tran 0.1n 400n\n.control\n.endc\n.end\n", mod)
+        mod = re.sub(r"Vin\s+in_node\s+0\s+DC\s+\S+", f"Vin in_node 0 DC {v:.3f}", sig_base)
+        mod = re.sub(r"\.control[\s\S]*", ".tran 0.1n 600n\n.control\n.endc\n.end\n", mod)
         data = run_ngspice_wrdata(mod, ["v(m_out)"], workdir, f"sig_{v:.3f}", seed=42)
         mask = data[:, 0] >= 10e-9
         probs.append(float(np.mean(data[mask, 1] > VTH)))
 
     probs = np.array(probs)
-    interior = (probs > 0.005) & (probs < 0.995)
+    interior = (probs > 0.01) & (probs < 0.99)
     x_fit = vins[interior]
     y_logit = np.log(probs[interior] / (1.0 - probs[interior]))
     slope, intercept = np.polyfit(x_fit, y_logit, 1)
     i0_fit = 2.0 / slope
     vth_fit = -intercept / slope
 
-    v_dense = np.linspace(0.835, 0.965, 200)
+    v_dense = np.linspace(0.35, 1.45, 200)
     p_fit = 1.0 / (1.0 + np.exp(-2.0 * (v_dense - vth_fit) / i0_fit))
 
     ss_tot = np.sum((probs[interior] - np.mean(probs[interior])) ** 2)
@@ -161,29 +164,30 @@ def generate_sigmoid_plot(spice_dir, results_dir, workdir):
     with open(os.path.join(spice_dir, "step5_single_pbit_dither.cir")) as f:
         dith_base = f.read()
     dith_mod = re.sub(r"\.tran\s+\S+\s+\S+", ".tran 0.1n 300n", dith_base)
-    dith_data = run_ngspice_wrdata(dith_mod, ["v(in_node)", "v(m_out)"], workdir, "single_cell_dith", seed=101)
+    dith_data = run_ngspice_wrdata(dith_mod, ["v(in_node)", "v(noise_node)", "v(m_out)"], workdir, "single_cell_dith", seed=101)
 
     t_ns = dith_data[:, 0] * 1e9
     v_in = dith_data[:, 1]
-    v_mout = dith_data[:, 3]
+    v_noise = dith_data[:, 3]
+    v_mout = dith_data[:, 5]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 4.8), dpi=300)
 
     ax1.plot(v_dense, p_fit, color="#0284c7", lw=2.2, label=f"Fit: $V_{{th}}={vth_fit:.3f}$V, $I_0={i0_fit*1e3:.1f}$mV ($R^2={r_squared:.4f}$)")
-    ax1.scatter(vins, probs, color="#0f766e", s=45, zorder=5, label="Ngspice Measured $P(m=+1)$")
+    ax1.scatter(vins, probs, color="#0f766e", s=40, zorder=5, label="Ngspice Measured $P(m=+1)$ ($R_{\\mathrm{in}}=500$k)")
     ax1.axvline(vth_fit, color="#dc2626", ls="--", lw=1.2, label=f"Trip Point $V_{{th}} = {vth_fit:.3f}$V")
     ax1.axhline(0.5, color="#64748b", ls=":", lw=1.0)
     ax1.set_title("Single CMOS p-Bit Boltzmann Sigmoid Activation")
     ax1.set_xlabel("Input DC Bias Voltage $V_{\\mathrm{in}}$ (V)")
     ax1.set_ylabel("Probability of State $+1$, $P(m = +1)$")
-    ax1.set_xlim(0.835, 0.965)
+    ax1.set_xlim(0.35, 1.45)
     ax1.set_ylim(-0.02, 1.02)
     ax1.legend(loc="upper left", fontsize=8.8, frameon=True)
 
     ax2.plot(t_ns, v_mout, color="#0f766e", lw=1.2, label="Digital Output $V(m_{\\mathrm{out}})$")
-    ax2.plot(t_ns, v_in, color="#f59e0b", lw=1.0, alpha=0.75, label="Metastable Gate Node $V(\\mathrm{in})$")
+    ax2.plot(t_ns, v_noise, color="#f59e0b", lw=1.0, alpha=0.75, label="Summing Gate Node $V(\\mathrm{noise})$")
     ax2.axhline(VTH, color="#dc2626", ls="--", lw=1.0, label="Trip Point $V_{th} = 0.9V$")
-    ax2.set_title("Stochastic Output Fluctuations Under Gaussian Thermal Noise")
+    ax2.set_title("Stochastic Output Fluctuations Under Calibrated Thermal Noise")
     ax2.set_xlabel("Time (ns)")
     ax2.set_ylabel("Voltage (V)")
     ax2.set_xlim(0, 300)
@@ -194,7 +198,7 @@ def generate_sigmoid_plot(spice_dir, results_dir, workdir):
     out_path = os.path.join(results_dir, "pbit_sigmoid_curve.png")
     plt.savefig(out_path, dpi=300)
     plt.close(fig)
-    print(f"      Saved {out_path} | Vth={vth_fit:.3f}V, I0={i0_fit*1e3:.2f}mV, R2={r_squared:.4f}")
+    print(f"      Saved {out_path} | Vth={vth_fit:.3f}V, I0={i0_fit*1e3:.1f}mV, R2={r_squared:.4f}")
     return vth_fit, i0_fit, r_squared
 
 
@@ -253,7 +257,7 @@ def generate_4pbit_transient_plot(spice_dir, results_dir, workdir):
     with open(os.path.join(spice_dir, "ising_4pbit_core.cir")) as f:
         core_net = f.read()
 
-    core_mod = make_core_variant(core_net, amp=OPERATING_AMP, seed=303, tstep="0.5n", tstop="2u")
+    core_mod = make_core_variant(core_net, amp=OPERATING_AMP, tstep="0.5n", tstop="2u")
     data = run_ngspice_wrdata(
         core_mod,
         ["v(m_out1)", "v(m_out2)", "v(m_out3)", "v(m_out4)"],
@@ -332,18 +336,17 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
     betas = []
     kls = []
     tvds = []
-    dwell_times_ns = []
-    escape_rates = []
+    raw_escape_rates = []
 
     for i_a, (a_str, a_mv) in enumerate(zip(sweep_amps, amp_mvs)):
         time_counts = Counter()
         total_escapes = 0
-        total_dwells_us = []
+        total_gs_time_us = 0.0
 
         for r in range(n_runs):
             init_st = ALL_16_STATES[r % 16]
             net = make_core_variant(
-                base_net, amp=a_str, seed=5000 + i_a * 100 + r, init_spins=init_st, tstep="0.5n", tstop="1u", uic=True
+                base_net, amp=a_str, init_spins=init_st, tstep="0.5n", tstop="1u", uic=True
             )
             data = run_ngspice_wrdata(
                 net,
@@ -369,7 +372,7 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
                 ends = np.r_[ends, len(is_gs) - 1]
 
             dwells = [t_us[e] - t_us[s] for s, e in zip(starts, ends) if e > s]
-            total_dwells_us.extend(dwells)
+            total_gs_time_us += sum(dwells)
             esc = (len(starts) - 1) if is_gs[-1] else len(starts)
             total_escapes += max(0, esc)
 
@@ -380,17 +383,14 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
         c3_f = sum(p for p, c in zip(p_emp, cuts_list) if c == 3)
 
         beta_fit, _, tvd_val, kl_val = fit_beta_eff(p_emp)
-        mean_dwell_ns = (np.mean(total_dwells_us) * 1e3) if total_dwells_us else 0.0
-        tot_gs_time_us = sum(total_dwells_us)
-        esc_rate = (total_escapes / tot_gs_time_us) if tot_gs_time_us > 0 else 0.0
+        esc_rate = (total_escapes / total_gs_time_us) if total_gs_time_us > 0 else 0.0
 
         gs_fracs.append(gs_f * 100.0)
         c3_fracs.append(c3_f * 100.0)
         betas.append(beta_fit)
         kls.append(kl_val)
         tvds.append(tvd_val)
-        dwell_times_ns.append(mean_dwell_ns)
-        escape_rates.append(esc_rate)
+        raw_escape_rates.append(esc_rate)
         print(
             f"      Amp={a_str:>5} | GS={gs_f*100:5.1f}% | C3={c3_f*100:5.1f}% | beta_eff={beta_fit:.3f} | KL={kl_val:.4f} | TVD={tvd_val:.4f} | esc={total_escapes}"
         )
@@ -410,7 +410,7 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
     ax1.legend(loc="center left", fontsize=8.5, frameon=True)
 
     ax2.plot(amp_mvs, betas, marker="D", lw=2.2, color="#0284c7", label="Fitted Inverse Temp $\\beta_{\\mathrm{eff}}$ (Min-KL)")
-    ax2.axvline(440, color="#dc2626", ls="--", lw=1.2, label="Operating Point (440 mV, $\\beta_{\\mathrm{eff}}=1.53$)")
+    ax2.axvline(440, color="#dc2626", ls="--", lw=1.2, label=f"Operating Point (440 mV, $\\beta={betas[5]:.2f}$)")
     ax2.set_title("Effective Temperature Scaling $\\beta_{\\mathrm{eff}}$ vs. Noise Amplitude")
     ax2.set_xlabel("Noise Amplitude $V_{\\mathrm{noise}}$ (mV RMS)")
     ax2.set_ylabel("Fitted Inverse Temperature $\\beta_{\\mathrm{eff}}$")
@@ -418,12 +418,13 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
     ax2.set_ylim(0.8, 5.5)
     ax2.legend(loc="upper right", fontsize=8.5, frameon=True)
 
+    op_idx = 5
     sweep_txt = (
         "Operating Regime Summary:\n"
-        "• Low Noise (<200 mV): Frozen, 0 escapes\n"
-        "• High Noise (>450 mV): Thermal mixing\n"
-        "• Operating Point (440 mV): 84.4% GS, 14.9% C3\n"
-        "  Fitted beta = 1.531 (Min-KL)"
+        f"• Low Noise (<200 mV): Frozen, 0 escapes\n"
+        f"• High Noise (>450 mV): Thermal mixing\n"
+        f"• Operating Point (440 mV): {gs_fracs[op_idx]:.1f}% GS, {c3_fracs[op_idx]:.1f}% C3\n"
+        f"  Fitted beta = {betas[op_idx]:.3f} (Min-KL)"
     )
     ax2.text(
         0.05,
@@ -441,7 +442,7 @@ def generate_noise_sweep(spice_dir, results_dir, workdir, n_runs=50):
     plt.savefig(out_path, dpi=300)
     plt.close(fig)
     print(f"      Saved {out_path}")
-    return sweep_amps, amp_mvs, gs_fracs, c3_fracs, betas, tvds, kls, dwell_times_ns, escape_rates
+    return sweep_amps, amp_mvs, gs_fracs, c3_fracs, betas, tvds, kls, raw_escape_rates
 
 
 def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
@@ -456,7 +457,7 @@ def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
         seed = 7000 + r
         init_state = ALL_16_STATES[r % 16]
         net = make_core_variant(
-            base_net, amp=OPERATING_AMP, seed=seed, init_spins=init_state, tstep="0.5n", tstop="1u", uic=True
+            base_net, amp=OPERATING_AMP, init_spins=init_state, tstep="0.5n", tstop="1u", uic=True
         )
         data = run_ngspice_wrdata(
             net,
@@ -486,7 +487,7 @@ def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
     c_low_total = sum(p for p, c in zip(probs_pct, cuts) if c < 3)
     final_gs = sum(v for st, v in final_counts.items() if state_to_cut(st) == 4)
 
-    # Rank deviations
+    # Rank deviations dynamically
     deviations = []
     for idx, st in enumerate(ALL_16_STATES):
         st_str = "(" + ",".join("+" if s == 1 else "-" for s in st) + ")"
@@ -581,6 +582,11 @@ def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
     ]
     ax.legend(handles=legend_handles, loc="upper left", fontsize=8.8, frameon=True)
 
+    top1 = deviations[0]
+    top2 = deviations[1]
+    sign1 = "+" if top1[6] > 0 else ""
+    sign2 = "+" if top2[6] > 0 else ""
+
     summary_txt = (
         f"Distribution Metrics (N = {n_runs} runs @ 440mV)\n"
         f"• (-1, +1, +1, -1): {probs_pct[6]:.2f}% (Boltz: {boltz_pct[6]:.2f}%)\n"
@@ -589,7 +595,7 @@ def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
         f"• 3/5-Cut Excited States: {c3_total:.2f}%\n"
         f"• Total Variation Distance (TVD): {tvd_val:.4f} ({tvd_val*100:.2f}%)\n"
         f"• KL Divergence: {kl_val:.4f} nats\n"
-        f"• Top Deviation: (+,-,-,+) (+1.50% / GS) & (-,+,-,-) (+1.42% / C3)"
+        f"• Top Deviations: {top1[1]} ({sign1}{top1[6]:.2f}%) & {top2[1]} ({sign2}{top2[6]:.2f}%)"
     )
     ax.text(
         0.985,
@@ -613,7 +619,7 @@ def generate_16state_histogram(spice_dir, results_dir, workdir, n_runs=50):
 
 
 def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
-    print(f"[6/6] Running convergence, dwell time & escape filtering at 440mV (N = {n_runs} runs)...")
+    print(f"[6/6] Running convergence & escape dynamics benchmark at 440mV (N = {n_runs} runs)...")
     with open(os.path.join(spice_dir, "ising_4pbit_core.cir")) as f:
         base_net = f.read()
 
@@ -627,14 +633,13 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
     first_hit_ns = []
 
     # Raw metrics
-    raw_dwells_ns = []
     raw_escapes_total = 0
     raw_gs_time_us = 0.0
 
     # Filtered metrics (persistence >= 2.0 ns)
-    filt2ns_dwells_ns = []
     filt2ns_escapes_total = 0
     filt2ns_gs_time_us = 0.0
+    run_filt_rates = []
 
     # Non-GS excursion durations to characterize chatter
     non_gs_durations = []
@@ -643,7 +648,7 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
         seed = 8000 + r
         init_state = non_gs_states[r % len(non_gs_states)]
         net = make_core_variant(
-            base_net, amp=OPERATING_AMP, seed=seed, init_spins=init_state, tstep="0.5n", tstop="1u", uic=True
+            base_net, amp=OPERATING_AMP, init_spins=init_state, tstep="0.5n", tstop="1u", uic=True
         )
         data = run_ngspice_wrdata(
             net,
@@ -674,8 +679,6 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
         if is_gs_raw[-1]:
             e_raw = np.r_[e_raw, len(is_gs_raw) - 1]
 
-        raw_dwells = [t_ns[e] - t_ns[s] for s, e in zip(s_raw, e_raw) if e > s]
-        raw_dwells_ns.extend(raw_dwells)
         esc_raw = (len(s_raw) - 1) if is_gs_raw[-1] else len(s_raw)
         raw_escapes_total += max(0, esc_raw)
         raw_gs_time_us += sum(t_us[e] - t_us[s] for s, e in zip(s_raw, e_raw) if e > s)
@@ -693,7 +696,6 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
                 non_gs_durations.append(t_ns[e] - t_ns[s])
 
         # 2. Filtered escapes (persistence >= 2.0 ns):
-        # Micro-glitches out of GS (< 2.0 ns) are chatter; bridge them back into GS
         is_gs_filt = np.copy(is_gs_raw)
         for s, e in zip(s_non, e_non):
             if e > s and (t_ns[e] - t_ns[s]) < 2.0:
@@ -707,11 +709,11 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
         if is_gs_filt[-1]:
             e_f = np.r_[e_f, len(is_gs_filt) - 1]
 
-        filt_dwells = [t_ns[e] - t_ns[s] for s, e in zip(s_f, e_f) if e > s]
-        filt2ns_dwells_ns.extend(filt_dwells)
         esc_filt = (len(s_f) - 1) if is_gs_filt[-1] else len(s_f)
+        run_gs_time_us = sum(t_us[e] - t_us[s] for s, e in zip(s_f, e_f) if e > s)
         filt2ns_escapes_total += max(0, esc_filt)
-        filt2ns_gs_time_us += sum(t_us[e] - t_us[s] for s, e in zip(s_f, e_f) if e > s)
+        filt2ns_gs_time_us += run_gs_time_us
+        run_filt_rates.append((max(0, esc_filt) / run_gs_time_us) if run_gs_time_us > 0 else 0.0)
 
     first_hit_ns = np.array(first_hit_ns)
     valid_hits = first_hit_ns[~np.isnan(first_hit_ns)]
@@ -720,13 +722,19 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
     p90_ns = float(np.percentile(valid_hits, 90))
     max_ns = float(np.max(valid_hits))
 
-    # Raw metrics
-    raw_mean_dwell_ns = float(np.mean(raw_dwells_ns)) if raw_dwells_ns else 0.0
+    # Aggregate rates
     raw_escape_rate = (raw_escapes_total / raw_gs_time_us) if raw_gs_time_us > 0 else 0.0
-
-    # Filtered metrics
-    filt_mean_dwell_ns = float(np.mean(filt2ns_dwells_ns)) if filt2ns_dwells_ns else 0.0
     filt_escape_rate = (filt2ns_escapes_total / filt2ns_gs_time_us) if filt2ns_gs_time_us > 0 else 0.0
+
+    # Rate range (Poisson standard error confidence interval)
+    rate_se = (np.sqrt(filt2ns_escapes_total) / filt2ns_gs_time_us) if filt2ns_gs_time_us > 0 else 0.0
+    rate_low = max(0.0, filt_escape_rate - rate_se)
+    rate_high = filt_escape_rate + rate_se
+
+    # Implied Poisson mean lifetime range
+    tau_true_us = (1.0 / filt_escape_rate) if filt_escape_rate > 0 else 10.0
+    tau_low_us = (1.0 / rate_high) if rate_high > 0 else 5.0
+    tau_high_us = (1.0 / rate_low) if rate_low > 0 else 20.0
 
     # Chatter statistics
     non_gs_arr = np.array(non_gs_durations)
@@ -735,8 +743,9 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
     med_excursion_ns = float(np.median(non_gs_arr)) if len(non_gs_arr) > 0 else 0.0
 
     print(f"\n      DYNAMICS COMPARISON (440 mV Noise, N = {n_runs} Runs):")
-    print(f"      • RAW / UNFILTERED:        Escapes = {raw_escapes_total:<5} | Mean Dwell = {raw_mean_dwell_ns:6.2f} ns | Rate = {raw_escape_rate:6.1f} / us")
-    print(f"      • FILTERED (>= 2 ns persist): Escapes = {filt2ns_escapes_total:<5} | Mean Dwell = {filt_mean_dwell_ns:6.2f} ns | Rate = {filt_escape_rate:6.2f} / us")
+    print(f"      • RAW / UNFILTERED:        Escapes = {raw_escapes_total:<5} | Rate = {raw_escape_rate:6.1f} / us")
+    print(f"      • FILTERED (>= 2 ns persist): Escapes = {filt2ns_escapes_total:<5} | Rate = {filt_escape_rate:6.2f} / us (Range: {rate_low:.2f} - {rate_high:.2f} / us)")
+    print(f"      • POISSON MEAN LIFETIME:   tau = {tau_true_us:.1f} us (Range: {tau_low_us:.1f} - {tau_high_us:.1f} us)")
     print(f"      • CHATTER BREAKDOWN:       Total Excursions = {len(non_gs_arr)} | <1.0ns: {pct_sub1ns:.1f}% | <2.0ns: {pct_sub2ns:.1f}% | Median: {med_excursion_ns:.3f} ns")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.0), dpi=300)
@@ -774,42 +783,43 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
         bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "edgecolor": "#cbd5e1"},
     )
 
-    # Panel 2: Persistent Dwell Time & Chatter Comparison
-    # Display the filtered dwell segments (physical state residence)
+    # Panel 2: Escape Rate & Right-Censoring Survival Dynamics
+    # Histogram of run-level escape rates
     ax2.hist(
-        filt2ns_dwells_ns,
-        bins=25,
-        range=(0, 1000.0),
+        run_filt_rates,
+        bins=15,
         color="#0f766e",
         edgecolor="#1e293b",
         linewidth=0.6,
         alpha=0.85,
-        label="Persistent GS Dwells ($\\Delta t \\geq 2$ ns)",
+        label="Run-Level Escape Rates ($\\mu\\mathrm{s}^{-1}$)",
     )
     ax2.axvline(
-        filt_mean_dwell_ns,
+        filt_escape_rate,
         color="#dc2626",
         lw=2.0,
         ls="--",
-        label=f"Filtered Mean Dwell $\\langle \\tau_{{\\mathrm{{dwell}}}} \\rangle = {filt_mean_dwell_ns:.1f}$ ns",
+        label=f"Mean Rate $R_{{\\mathrm{{escape}}}} = {filt_escape_rate:.2f}$ / $\\mu$s",
     )
-    ax2.set_title("Ground-State Dwell Duration & Escape Rate (440 mV Noise)")
-    ax2.set_xlabel("Persistent Ground-State Dwell $\\tau_{\\mathrm{dwell}}$ (ns)")
-    ax2.set_ylabel("Observed Event Count")
+    ax2.axvspan(rate_low, rate_high, color="#dc2626", alpha=0.15, label=f"SE Range: [{rate_low:.2f}, {rate_high:.2f}] / $\\mu$s")
+    ax2.set_title("Thermodynamic Escape Dynamics (440 mV Noise)")
+    ax2.set_xlabel("Physical Escape Rate $R_{\\mathrm{escape}}$ (escapes / $\\mu$s)")
+    ax2.set_ylabel("Run Count")
     ax2.legend(loc="upper right", fontsize=8.5, frameon=True)
 
     panel2_txt = (
-        f"Escape & Chatter Analysis (N = {n_runs} runs @ 440mV)\n"
-        f"1. Filtered (Persistence >= 2 ns, Physical States):\n"
+        f"Escape Dynamics Analysis (N = {n_runs} runs @ 440mV)\n"
+        f"1. Filtered Rate (Persistence $\\geq 2$ ns, Physical Barrier Hops):\n"
         f"   • Real Barrier Escapes: {filt2ns_escapes_total}\n"
-        f"   • Filtered Mean Dwell: {filt_mean_dwell_ns:.1f} ns\n"
-        f"   • Real Escape Rate: {filt_escape_rate:.2f} / $\\mu$s\n"
-        f"2. Raw / Unfiltered (Output Chatter Included):\n"
+        f"   • Escape Rate Range: {rate_low:.2f} - {rate_high:.2f} / $\\mu$s (Mean: {filt_escape_rate:.2f} / $\\mu$s)\n"
+        f"   • Implied Poisson Lifetime: {tau_true_us:.1f} $\\mu$s (Range: {tau_low_us:.1f} - {tau_high_us:.1f} $\\mu$s)\n"
+        f"   • Dwell Note: Within 1 $\\mu$s sim window, sample dwell is\n"
+        f"     right-censored at 1,000 ns; rate range is the honest metric.\n"
+        f"2. Raw / Unfiltered Rate (Buffer Chatter Included):\n"
         f"   • Raw Threshold Crossings: {raw_escapes_total}\n"
-        f"   • Raw Mean Dwell: {raw_mean_dwell_ns:.2f} ns\n"
-        f"   • Raw Rate: {raw_escape_rate:.1f} / $\\mu$s\n"
+        f"   • Raw Chatter Rate: {raw_escape_rate:.1f} / $\\mu$s\n"
         f"3. Chatter Origin: {pct_sub2ns:.1f}% of raw excursions\n"
-        f"   last < 2.0 ns (median {med_excursion_ns:.2f} ns), caused by\n"
+        f"   last < 2.0 ns (median {med_excursion_ns:.2f} ns), driven by\n"
         f"   single 0.2 ns trnoise kicks across V_th."
     )
     ax2.text(
@@ -828,18 +838,19 @@ def generate_convergence_plot(spice_dir, results_dir, workdir, n_runs=50):
     plt.savefig(out_path, dpi=300)
     plt.close(fig)
     print(
-        f"      Saved {out_path} | Filtered Dwell={filt_mean_dwell_ns:.1f}ns, Filtered Escapes={filt2ns_escapes_total}, Rate={filt_escape_rate:.2f}/us"
+        f"      Saved {out_path} | Filtered Escapes={filt2ns_escapes_total}, Rate={filt_escape_rate:.2f}/us, Poisson tau={tau_true_us:.1f}us"
     )
     return (
         hit_count,
         med_ns,
         max_ns,
         raw_escapes_total,
-        raw_mean_dwell_ns,
         raw_escape_rate,
         filt2ns_escapes_total,
-        filt_mean_dwell_ns,
         filt_escape_rate,
+        rate_low,
+        rate_high,
+        tau_true_us,
         pct_sub2ns,
     )
 

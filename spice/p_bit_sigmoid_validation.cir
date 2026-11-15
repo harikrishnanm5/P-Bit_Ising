@@ -1,53 +1,59 @@
 * ==============================================================================
 * Empirical Sigmoid Curve Extraction for CMOS Probabilistic Bit (p-bit)
+* Standardized 180nm CMOS with Calibrated 440mV Noise & Rin = 500k / Rfb = 500k
 * Sweeps Input Synaptic Bias Voltage (Vin) & Measures Output Probability P(m=1)
 * ==============================================================================
 
 .title CMOS p-bit Sigmoid Activation Verification
 
 Vdd vdd 0 DC 1.8V
-Vin in_node 0 DC 0.9V
+Vin in_node 0 DC 0.90V
 
-* Pseudo-Random Gaussian Perturbation (Ngspice trnoise emulating thermal noise)
-Vnoise noise_node in_node trnoise(35m 0.2n 0 0)
+* Real Gaussian Thermal Noise Source (Calibrated 440mV RMS, 0.2ns step)
+Vnoise dither_node in_node DC 0 trnoise(440m 0.2n 0 0)
 
-* CMOS Metastable Noise Amplifier (All L = 0.18u)
+* Series Input Summing Resistor (Matches Master Core Architecture)
+Rin dither_node noise_node 500k
+
+* CMOS Metastable Noise Amplifier
 MP1 analog_out noise_node vdd vdd PMOS_PBIT W=2.5u L=0.18u
 MN1 analog_out noise_node 0   0   NMOS_PBIT W=1.0u L=0.18u
-Rfb noise_node analog_out 200k
+Rfb noise_node analog_out 500k
 C1 analog_out 0 15fF
 
-* Digital Inverter Buffer (All L = 0.18u)
+* Digital Restoring Inverter Buffer
 MP_BUF m_out analog_out vdd vdd PMOS_PBIT W=3.0u L=0.18u
 MN_BUF m_out analog_out 0   0   NMOS_PBIT W=1.5u L=0.18u
 Cout m_out 0 20fF
 
+* CMOS Level-1 Transistor Models
 .model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 .model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
 
 .control
-  let v_start = 0.84
-  let v_stop = 0.965
-  let v_step = 0.01
-  let n_points = 13
+  set rndseed = 42
+  let v_start = 0.40
+  let v_stop = 1.40
+  let v_step = 0.10
+  let n_points = 11
 
-  let vin_arr = unitvec(13)
-  let prob_arr = unitvec(13)
+  let vin_arr = unitvec(11)
+  let prob_arr = unitvec(11)
 
   let idx = 0
   let v_cur = v_start
 
   echo "========================================================================"
-  echo " EMPIRICAL SIGMOID VALIDATION: Sweeping Input Bias Vin (0.84V -> 0.96V)"
+  echo " EMPIRICAL SIGMOID VALIDATION: Sweeping Input Bias Vin (0.40V -> 1.40V)"
   echo "========================================================================"
   echo "  Vin (V)  |  Mean V(m_out) (V)  |  Empirical P(m = 1)  |  State Tendency"
   echo "-----------+---------------------+----------------------+----------------"
 
   while v_cur <= v_stop
     alter Vin = v_cur
-    tran 0.1n 200n
+    tran 0.1n 400n
 
-    meas tran v_avg avg v(m_out) from=10n to=200n
+    meas tran v_avg avg v(m_out) from=10n to=400n
     let p_one = v_avg / 1.8
 
     let vin_arr[idx] = v_cur
@@ -68,7 +74,7 @@ Cout m_out 0 20fF
   end
 
   echo "========================================================================"
-  echo " Sigmoid verification completed successfully!"
+  echo " Sigmoid verification completed successfully."
   echo "========================================================================"
 
   plot prob_arr vs vin_arr title 'Empirical p-bit Sigmoid Activation: P(m=1) vs Vin' xlabel 'Synaptic Input Bias Vin (V)' ylabel 'P(m=1)'

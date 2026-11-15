@@ -1,15 +1,25 @@
-* 4-p-Bit Ising Core
+* ==============================================================================
+* 4-p-Bit Ising Core Verification Testbench
+* Verifies Ground-State Convergence at t = 1.0 us
+* ==============================================================================
+
+.title 4-p-Bit Ising Core Verification Testbench
+
 .include ising_4pbit_core.cir
+
 .control
+  set rndseed = 42
   run
-  meas tran o1 find v(m_out1) at=1m
-  meas tran o2 find v(m_out2) at=1m
-  meas tran o3 find v(m_out3) at=1m
-  meas tran o4 find v(m_out4) at=1m
-  echo FINAL_OUTPUTS_AT_1MS:
+  meas tran o1 find v(m_out1) at=1u
+  meas tran o2 find v(m_out2) at=1u
+  meas tran o3 find v(m_out3) at=1u
+  meas tran o4 find v(m_out4) at=1u
+  echo FINAL_OUTPUTS_AT_1US:
   echo   P1 m_out1 = $&o1
   echo   P2 m_out2 = $&o2
   echo   P3 m_out3 = $&o3
   echo   P4 m_out4 = $&o4
   quit
 .endc
+
+.end

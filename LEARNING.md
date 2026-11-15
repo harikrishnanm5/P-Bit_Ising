@@ -1,15 +1,15 @@
 # 📘 Comprehensive Learning & Interview Study Guide: CMOS Probabilistic Bits (p-Bits) and Ising Optimization
 
-This document serves as an exhaustive, first-principles technical study guide for the **Reconfigurable 4-p-Bit CMOS Ising Accelerator**. It covers conceptual physics, mathematical derivations, circuit architecture, line-by-line SPICE netlist walkthroughs, operating regimes, chatter analysis vs. thermodynamic escape dynamics, and 22 high-yield technical interview questions with sharp, rigorous answers.
+This document serves as an exhaustive, first-principles technical study guide for the **Reconfigurable 4-p-Bit CMOS Ising Accelerator**. It covers conceptual physics, mathematical derivations, circuit architecture, line-by-line SPICE netlist walkthroughs of [`spice/ising_4pbit_core.cir`](spice/ising_4pbit_core.cir), operating regimes, chatter analysis vs. thermodynamic escape dynamics, and 22 high-yield technical interview questions with sharp, rigorous answers.
 
 ---
 
 ## 📑 Table of Contents
 1. [First-Principles Conceptual Guide](#1-first-principles-conceptual-guide)
    - [1.1 What is a Probabilistic Bit (p-Bit)?](#11-what-is-a-probabilistic-bit-p-bit)
-   - [1.2 Why the Inverter is Biased at Its Trip Point ($V_{th} = 0.90\text{ V}$)](#12-why-the-inverter-is-biased-at-its-trip-point-v_th--090text-v)
+   - [1.2 Why the Inverter is Biased at Its Trip Point (0.90V)](#12-why-the-inverter-is-biased-at-its-trip-point-090v)
    - [1.3 How the Boltzmann Sigmoid Emerges from Noise](#13-how-the-boltzmann-sigmoid-emerges-from-noise)
-   - [1.4 How Resistive Coupling Implements Synaptic Weights ($J_{ij}$)](#14-how-resistive-coupling-implements-synaptic-weights-j_ij)
+   - [1.4 How Resistive Coupling Implements Synaptic Weights](#14-how-resistive-coupling-implements-synaptic-weights)
    - [1.5 Mapping MAX-CUT to the Ising Hamiltonian](#15-mapping-max-cut-to-the-ising-hamiltonian)
    - [1.6 Mathematical Proof: Why 4/5 is the Global Maximum Cut](#16-mathematical-proof-why-45-is-the-global-maximum-cut)
 2. [Line-by-Line SPICE Netlist Walkthrough (`spice/ising_4pbit_core.cir`)](#2-line-by-line-spice-netlist-walkthrough-spiceising_4pbit_corecir)
@@ -17,7 +17,7 @@ This document serves as an exhaustive, first-principles technical study guide fo
 4. [Convergence Dynamics: RC Settling vs. Stationary Langevin Diffusion](#4-convergence-dynamics-rc-settling-vs-stationary-langevin-diffusion)
    - [4.1 Why Initial Time-to-First-Ground-State is Misleading](#41-why-initial-time-to-first-ground-state-is-misleading)
    - [4.2 Output Chatter vs. Physical Thermodynamic Dwell Time](#42-output-chatter-vs-physical-thermodynamic-dwell-time)
-   - [4.3 Persistence Filtering ($\Delta t \ge 2.0\text{ ns}$) vs. Voltage Hysteresis](#43-persistence-filtering-delta-t-ge-20text-ns-vs-voltage-hysteresis)
+   - [4.3 Persistence Filtering vs. Voltage Hysteresis & Right-Censoring](#43-persistence-filtering-vs-voltage-hysteresis--right-censoring)
 5. [16-State Boltzmann Sampling Deviations & Degree Asymmetry](#5-16-state-boltzmann-sampling-deviations--degree-asymmetry)
 6. [22 High-Yield Technical Interview Questions & Answers](#6-22-high-yield-technical-interview-questions--answers)
 
@@ -33,11 +33,11 @@ In computing, we classify state variables into three distinct paradigms:
 
 $$P(m_i = +1) = \sigma(2 \beta I_i) = \frac{1}{1 + \exp\left(-\frac{2(I_i - V_{th})}{I_0}\right)}$$
 
-where $I_i$ is the synaptic input voltage arriving at the p-bit, $V_{th}$ is the switching threshold, and $I_0$ represents the thermal noise voltage scale. A p-bit is thus a hardware building block that natively performs **Markov Chain Monte Carlo (MCMC)** and **Boltzmann sampling** in physical time without random number generation software overhead.
+where $I_i$ is the synaptic input voltage arriving at the p-bit, $V_{th} \approx 0.94\text{ V}$ is the switching threshold, and $I_0 \approx 363.0\text{ mV}$ is the noise voltage scale measured across the balanced $R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega$ cell driven by calibrated $440\text{ mV}$ noise. A p-bit is thus a hardware building block that natively performs **Markov Chain Monte Carlo (MCMC)** and **Boltzmann sampling** in physical time without random number generation software overhead.
 
 ---
 
-### 1.2 Why the Inverter is Biased at Its Trip Point ($V_{th} = 0.90\text{ V}$)
+### 1.2 Why the Inverter is Biased at Its Trip Point (0.90V)
 A standard CMOS inverter consists of a pull-up PMOS and a pull-down NMOS. 
 * The **trip point** (or switching threshold $V_M$) is the operating point where $V_{\text{in}} = V_{\text{out}} = V_{th}$. For a symmetric $1.8\text{ V}$ supply rail ($V_{DD}$), $V_{th} = V_{DD} / 2 = 0.90\text{ V}$.
 * At this exact bias point:
@@ -63,11 +63,11 @@ $$P(m = +1) = \int_{V_{th} - V_{\text{in}}}^{\infty} \frac{1}{\sqrt{2\pi}\sigma}
 
 $$\frac{1}{2} \left[1 + \text{erf}\left(\frac{x}{\sqrt{2}\sigma}\right)\right] \approx \frac{1}{1 + \exp\left(-\frac{2 x}{I_0}\right)}$$
 
-where $I_0 \approx \sqrt{2\pi}\sigma \approx 2.5 \sigma$. Thus, injecting Gaussian noise into a high-gain non-linear threshold element **physically generates the Boltzmann activation function**.
+where $I_0 \approx \sqrt{2\pi}\sigma \approx 2.5 \sigma$. For our standardized cell with $440\text{ mV}$ RMS noise coupled through $R_{\text{in}} = 500\text{ k}\Omega$, empirical fitting yields $I_0 \approx 363.0\text{ mV}$ ($R^2 = 0.9941$).
 
 ---
 
-### 1.4 How Resistive Coupling Implements Synaptic Weights ($J_{ij}$)
+### 1.4 How Resistive Coupling Implements Synaptic Weights
 In an Ising machine, the local effective field acting on spin $i$ is:
 
 $$h_i = \sum_{j \neq i} J_{ij} s_j$$
@@ -152,73 +152,82 @@ $E = \{(1,2), (1,3), (2,3), (2,4), (3,4)\}$.
 
 ## 2. Line-by-Line SPICE Netlist Walkthrough (`spice/ising_4pbit_core.cir`)
 
-```spice
-* 4-p-bit Autonomous Ising MAX-CUT Solver Core (180nm CMOS)
-```
-Header declaring technology and functional block.
+Below is the line-by-line breakdown of the master netlist [`spice/ising_4pbit_core.cir`](spice/ising_4pbit_core.cir):
 
-```spice
-.model CMOSN NMOS (LEVEL=1 VTO=0.7 KP=110U GAMMA=0.4 PHI=0.6 LAMBDA=0.04)
-.model CMOSP PMOS (LEVEL=1 VTO=-0.7 KP=50U GAMMA=0.4 PHI=0.6 LAMBDA=0.04)
-```
-Foundry-standard 180nm Level-1 Shichman-Hodges transistor models. Note symmetric threshold magnitudes ($|V_{TO}| = 0.7\text{ V}$) and transconductance parameter ratio ($KP_N / KP_P = 110/50 \approx 2.2$), which governs transistor sizing.
-
+### 2.1 Power Supply, Control & Complementary Mode Generation
 ```spice
 Vdd vdd 0 DC 1.8V
 Vmode mode 0 DC 1.8V
-```
-Power rails: $1.8\text{ V}$ primary supply. $V_{\text{mode}} = 1.8\text{ V}$ activates all transmission gates to enable the full 4-p-bit graph topology. Setting $V_{\text{mode}} = 0\text{ V}$ disables transmission gates, isolating a 2-p-bit dimer pair.
 
+* Complementary MODE Generation (Inverter)
+MP_INV mode_bar mode vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN_INV mode_bar mode 0   0   NMOS_PBIT W=1.0u L=0.18u
+```
+- `Vdd`: $1.8\text{ V}$ primary DC power rail.
+- `Vmode`: Operating mode select. $1.8\text{ V}$ enables all 5 graph edges (4-p-bit mode); $0.0\text{ V}$ disables transmission gates to isolate an independent 2-p-bit pair ($P_1 \leftrightarrow P_2$).
+- `MP_INV` / `MN_INV`: CMOS inverter generating complementary control signal `mode_bar`. When `mode = 1.8V`, `mode_bar = 0.0V` ($1.6\times 10^{-9}\text{ V}$).
+
+### 2.2 Transistor Models (180nm CMOS Level-1)
 ```spice
-Vbias1 in1 0 DC 0.9V
-Vnoise1 dither1 in1 trnoise(440m 0.2n 0 0)
+.model NMOS_PBIT NMOS (LEVEL=1 VTO=0.45 KP=150u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+.model PMOS_PBIT PMOS (LEVEL=1 VTO=-0.45 KP=60u GAMMA=0.4 PHI=0.6 LAMBDA=0.05)
+```
+- Symmetric threshold magnitudes: $|V_{TO}| = 0.45\text{ V}$.
+- Transconductance ratio: $\frac{KP_n}{KP_p} = \frac{150\,\mu\text{A/V}^2}{60\,\mu\text{A/V}^2} = 2.50$.
+- All transistors have channel length $L = 0.18\,\mu\text{m}$.
+
+### 2.3 DC Biases, Noise Sources & Input Summing Network
+```spice
+Vbias1 in1 0 DC 0.90V
+Vnoise1 dither1 in1 DC 0 trnoise(440m 0.2n 0 0)
 Rin1 dither1 noise1 500k
 ```
-p-bit 1 stochastic input network:
-1. `Vbias1` sets the DC trip point $V_{th} = 0.90\text{ V}$.
-2. `Vnoise1` generates physical zero-mean Gaussian thermal noise with $440\text{ mV}$ RMS amplitude updating every $0.2\text{ ns}$ ($5\text{ GHz}$ white noise bandwidth).
-3. `Rin1` ($500\text{ k}\Omega$) isolates the noise voltage source from node `noise1`, ensuring Kirchhoff current summing with neighbor coupling resistors without shorting the gate node.
+(Repeated for $P_1$ through $P_4$)
+- `Vbias1`: Sets the quiescent input at the mid-rail trip point $V_{th} = V_{DD}/2 = 0.90\text{ V}$.
+- `Vnoise1`: Independent Gaussian thermal noise source with $440\text{ mV}$ RMS amplitude updating every $0.2\text{ ns}$ ($5\text{ GHz}$ bandwidth). Explicit `DC 0` prevents Ngspice time-zero warnings.
+- `Rin1`: $500\text{ k}\Omega$ input summing resistor. It isolates the zero-impedance voltage source from gate node `noise1`, allowing passive linear superposition with feedback and coupling currents.
 
+### 2.4 Discrete p-Bit Cell Topology ($P_1$ Example)
 ```spice
-M1 a1 noise1 0 0 CMOSN W=1.8u L=0.18u
-M2 a1 noise1 vdd vdd CMOSP W=3.6u L=0.18u
-```
-The core high-gain metastable CMOS inverter for p-bit 1:
-- NMOS is sized at $W/L = 1.8\mu / 0.18\mu = 10$.
-- PMOS is sized at $W/L = 3.6\mu / 0.18\mu = 20$ (a $2:1$ sizing ratio matching the mobility ratio $\mu_n / \mu_p \approx 2.2$, ensuring a symmetric trip point at exactly $V_{DD}/2 = 0.90\text{ V}$).
-- Drain node `a1` is the internal analog metastable output.
-
-```spice
-Rfb1 a1 noise1 500k
+* --- p-Bit Cell P1 ---
+MP1 a1 noise1 vdd vdd PMOS_PBIT W=2.5u L=0.18u
+MN1 a1 noise1 0   0   NMOS_PBIT W=1.0u L=0.18u
+Rfb1 noise1 a1 500k
 C1 a1 0 15fF
+MP_BUF1 m_out1 a1 vdd vdd PMOS_PBIT W=3.0u L=0.18u
+MN_BUF1 m_out1 a1 0   0   NMOS_PBIT W=1.5u L=0.18u
+Cout1 m_out1 0 20fF
 ```
-Feedback and stabilization:
-- `Rfb1` ($500\text{ k}\Omega$) provides negative DC feedback from output `a1` to input `noise1`, holding the DC operating point at $V_{th} = 0.90\text{ V}$.
-- `C1` ($15\text{ fF}$) models total nodal capacitance (parasitic gate-drain, layout routing, and intentional integration capacitance). It establishes the dominant pole $\tau = R_{\text{eq}} C_1 \approx 125\text{ k}\Omega \times 15\text{ fF} \approx 1.88\text{ ns}$, filtering multi-gigahertz oscillations.
+- `MP1` / `MN1`: The core metastable inverting amplifier:
+  - $W_p = 2.5\,\mu\text{m}$, $W_n = 1.0\,\mu\text{m}$ ($\frac{W_p}{W_n} = 2.5$).
+  - $\beta_n = KP_n \cdot \frac{W_n}{L} = 150\mu \times \frac{1.0}{0.18} = 833.3\,\mu\text{A/V}^2$.
+  - $\beta_p = KP_p \cdot \frac{W_p}{L} = 60\mu \times \frac{2.5}{0.18} = 833.3\,\mu\text{A/V}^2$.
+  - Because $\beta_n = \beta_p$, the inverter switching threshold is balanced at exactly $V_{DD}/2 = 0.900\text{ V}$.
+- `Rfb1` ($500\text{ k}\Omega$): DC negative feedback from `a1` to `noise1`, self-biasing the inverter at its trip point.
+- `C1` ($15\text{ fF}$): Dominant-pole integration capacitor setting the nodal RC relaxation time $\tau \approx 1.88\text{ ns}$.
+- `MP_BUF1` / `MN_BUF1`: Digital restoring inverter ($W_p = 3.0\mu, W_n = 1.5\mu$) isolating `a1` from load impedance and sharpening outputs into digital $0\text{ V} \leftrightarrow 1.8\text{ V}$.
+- `Cout1` ($20\text{ fF}$): Digital output load capacitance.
 
+### 2.5 Synaptic Coupling & Transmission Gate Network
 ```spice
-Mbuf1_n m_out1 a1 0 0 CMOSN W=1.8u L=0.18u
-Mbuf1_p m_out1 a1 vdd vdd CMOSP W=3.6u L=0.18u
-```
-Output digital restoring buffer:
-- Isolates high-impedance internal node `a1` from coupling loads.
-- Sharpens analog fluctuations ($0.4\text{ V}$ to $1.4\text{ V}$) into digital rail-to-rail voltages ($0\text{ V}$ or $1.8\text{ V}$).
+* Edge 1: P1 - P2 (Permanent Edge)
+R_c12 a1 noise2 500k
+R_c21 a2 noise1 500k
 
-```spice
-Rc12 a1 noise2 500k
-Rc21 a2 noise1 500k
-```
-Antiferromagnetic coupling between $P_1$ and $P_2$:
-- Passive $500\text{ k}\Omega$ resistor connects internal node `a1` to neighbor gate `noise2`.
-- When $P_1$ is $+1$ ($m_{\text{out1}} = 1.8\text{ V}$), internal node `a1` is $0.0\text{ V}$, sinking current from `noise2` and pulling $P_2$ toward $-1$. This bidirectional symmetry implements symmetric $J_{12} = J_{21} < 0$.
+* Edge 2: P1 - P3 (Switchable via Discrete CMOS Transmission Gate)
+R_c13 a1 tg_13 500k
+MN_TG13 tg_13 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG13 tg_13 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
 
-```spice
-Xsw_c13 a1 c13_int mode mode_b TG_SWITCH
-Rc13 c13_int noise3 500k
+R_c31 a3 tg_31 500k
+MN_TG31 tg_31 mode noise1 0 NMOS_PBIT W=1.0u L=0.18u
+MP_TG31 tg_31 mode_bar noise1 vdd PMOS_PBIT W=2.5u L=0.18u
 ```
-Reconfigurable transmission-gate edge $(P_1 \leftrightarrow P_3)$:
-- When `mode = 1.8V` (`mode_b = 0V`), the CMOS transmission gate conducts ($R_{\text{on}} \approx 1.5\text{ k}\Omega \ll 500\text{ k}\Omega$), activating the edge.
-- When `mode = 0.0V`, the switch opens ($R_{\text{off}} > 10^{10}\text{ }\Omega$), completely disconnecting $P_3$.
+- `R_c12` / `R_c21`: Symmetric $500\text{ k}\Omega$ coupling resistors implementing permanent antiferromagnetic interaction ($J_{12} < 0$).
+- Edge 2–5 Switches: Implemented using discrete, parallel NMOS/PMOS pairs (`MN_TG*` and `MP_TG*`):
+  - When `mode = 1.8V` and `mode_bar = 0.0V`, both transistors conduct across rail-to-rail potentials ($R_{\text{on}} \approx 1.5\text{ k}\Omega \ll 500\text{ k}\Omega$).
+  - When `mode = 0.0V` and `mode_bar = 1.8V`, both transistors turn OFF ($R_{\text{off}} > 10^{10}\,\Omega$), isolating the edge with zero floating nodes (node `tg_13` is held at `a1` through $R_{c13}$).
+- Transient specification: `.tran 0.5n 2u` defines integration. The master netlist contains no `.control` block, preventing duplicate simulation runs when included in testbenches.
 
 ---
 
@@ -245,7 +254,7 @@ Noise Amplitude Spectrum:
   - Ground-state fraction: **84.1%**.
   - 3/5-cut excited-state fraction: **15.0%**.
   - Non-ground-state sampling: active exploration of the 10 excited states.
-  - Real fitted $\beta_{\text{eff}} = 1.522$ (min-KL fit), yielding honest $\text{TVD} = 0.0480$ and $\text{KL} = 0.0220\text{ nats}$.
+  - Real fitted $\beta_{\text{eff}} = 1.521$ (min-KL fit), yielding honest $\text{TVD} = 0.0440$ and $\text{KL} = 0.0219\text{ nats}$.
 
 ### 3. Thermal Overwhelm Regime ($V_{\text{noise}} > 600\text{ mV}$)
 * Noise dominates over coupling. Spins toggle randomly and independently, driving the distribution toward uniform random probability (6.25% per state, 12.5% for the two ground states combined), with $\beta_{\text{eff}} \to 0$.
@@ -261,30 +270,35 @@ When an excited state is forced using `.ic`:
 * **This initial drop is purely linear RC circuit discharge and gate delay, NOT simulated annealing!**
 
 ### 4.2 Output Chatter vs. Physical Thermodynamic Dwell Time
-In hardware measurements, counting every threshold crossing $V(m_{\text{out}}) = 0.90\text{ V}$ yields over 17,700 "escapes" per 50 runs. Detailed duration analysis of all 17,788 non-ground-state excursions reveals:
+In hardware measurements, counting every threshold crossing $V(m_{\text{out}}) = 0.90\text{ V}$ yields over 18,000 "escapes" per 50 runs. Detailed duration analysis of all 18,050 non-ground-state excursions reveals:
 * **$31.0\%$** last $< 0.2\text{ ns}$ (a single noise sample step).
-* **$97.7\%$** last $< 1.0\text{ ns}$.
-* **$100.0\%$ (99.96%)** last $< 2.0\text{ ns}$ (median excursion duration is **$0.28\text{ ns}$**).
+* **$97.9\%$** last $< 1.0\text{ ns}$.
+* **$100.0\%$** last $< 2.0\text{ ns}$ (median excursion duration is **$0.28\text{ ns}$**).
 
 These sub-nanosecond excursions are **output buffer chatter** caused by single high-frequency noise spikes pushing the gate briefly past $V_{th}$. The circuit does not actually settle into an excited state; it snaps right back as soon as the noise sample ends.
 
-### 4.3 Persistence Filtering ($\Delta t \ge 2.0\text{ ns}$) vs. Voltage Hysteresis
-1. **Why Voltage Hysteresis Fails**: Because the restoring buffer is a high-gain CMOS inverter, even a 10 mV gate excursion causes $m_{\text{out}}$ to swing rail-to-rail (0V to 1.8V) within 50–100 ps. Testing hysteresis bands as wide as $0.20\text{ V} / 1.60\text{ V}$ on $m_{\text{out}}$ still leaves $>15,000$ trips!
+### 4.3 Persistence Filtering vs. Voltage Hysteresis & Right-Censoring
+1. **Why Voltage Hysteresis Fails**: Because the restoring buffer is a high-gain CMOS inverter, even a 10 mV gate excursion causes $m_{\text{out}}$ to swing rail-to-rail (0V to 1.8V) within 50–100 ps. Testing hysteresis bands as wide as $0.20\text{ V} / 1.60\text{ V}$ on $m_{\text{out}}$ still leaves $>15,000$ trips.
 2. **The Physical Persistence Filter**: The physical summing node has an RC time constant $\tau \approx 1.88\text{ ns}$. A genuine thermodynamic escape requires the state to persist for $\Delta t \ge 2.0\text{ ns}$.
-3. **Filtered Comparison**:
-   - **Raw / Unfiltered**: 17,739 escapes, mean dwell $= 2.47\text{ ns}$, escape rate $= 403.8\text{ / }\mu\text{s}$.
-   - **Filtered ($\Delta t \ge 2.0\text{ ns}$)**: **7 escapes**, mean dwell $= \mathbf{892.6\text{ ns}}$, escape rate $= \mathbf{0.14\text{ / }\mu\text{s}}$.
+3. **Right-Censored Dwell Time vs. Escape Rate Range**:
+   - In a $1.0\text{ }\mu\text{s}$ observation window, $>85\%$ of individual simulation runs experience **zero physical escapes**.
+   - Consequently, the observed ground-state dwell segments are right-censored at $1,000\text{ ns}$ (the simulation end).
+   - Averaging censored $1,000\text{ ns}$ runs produces an artificially truncated sample mean (~$900\text{ ns}$).
+   - **The honest, uncensored metric is the physical escape rate range**:
+     $$R_{\text{escape}} \approx \mathbf{0.04\text{ – }0.12\text{ / }\mu\text{s}} \quad (\text{mean: } 0.08\text{ / }\mu\text{s})$$
+   - Under Poisson Maximum Likelihood Estimation ($\hat{\tau} = 1/\hat{\lambda}$), the true physical mean state lifetime is:
+     $$\tau_{\text{true}} = \frac{1}{R_{\text{escape}}} \approx \mathbf{8.3\text{ – }25.0\text{ }\mu\text{s}} \quad (\text{mean: } 12.5\text{ }\mu\text{s})$$
 
 ---
 
 ## 5. 16-State Boltzmann Sampling Deviations & Degree Asymmetry
 
-In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution closely follows the theoretical Boltzmann distribution ($\text{TVD} = 0.0480$, $\text{KL} = 0.0220\text{ nats}$). The top deviating states are:
-1. `(-1, +1, -1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.46%** vs. Boltzmann = **1.99%** ($\Delta = \mathbf{+1.47\%}$)
-2. `(+1, -1, -1, +1)` (Cut = 4/5, $H = -3$): Empirical = **43.30%** vs. Boltzmann = **41.84%** ($\Delta = \mathbf{+1.46\%}$)
-3. `(-1, -1, +1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.25%** vs. Boltzmann = **1.99%** ($\Delta = \mathbf{+1.26\%}$)
-4. `(-1, +1, +1, -1)` (Cut = 4/5, $H = -3$): Empirical = **40.81%** vs. Boltzmann = **41.84%** ($\Delta = \mathbf{-1.04\%}$)
-5. `(+1, -1, +1, -1)` (Cut = 3/5, $H = -1$): Empirical = **1.01%** vs. Boltzmann = **1.99%** ($\Delta = \mathbf{-0.99\%}$)
+In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution closely follows the theoretical Boltzmann distribution ($\text{TVD} = 0.0440$, $\text{KL} = 0.0219\text{ nats}$). The top deviating states are:
+1. `(-1, +1, -1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.44%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{+1.44\%}$)
+2. `(-1, -1, +1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.32%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{+1.32\%}$)
+3. `(+1, -1, -1, +1)` (Cut = 4/5, $H = -3$): Empirical = **42.83%** vs. Boltzmann = **41.83%** ($\Delta = \mathbf{+1.01\%}$)
+4. `(+1, -1, +1, -1)` (Cut = 3/5, $H = -1$): Empirical = **1.03%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{-0.96\%}$)
+5. `(-1, -1, +1, +1)` (Cut = 3/5, $H = -1$): Empirical = **1.04%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{-0.95\%}$)
 
 ### Physical Cause of the Deviation:
 * **Degree Asymmetry**: Nodes $P_2$ and $P_3$ have degree 3 (3 incident coupling resistors), while nodes $P_1$ and $P_4$ have degree 2.
@@ -336,7 +350,7 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 ---
 
 ### Q8: What metric actually reflects hardware sampling dynamics, and why?
-**Answer**: Ground-state dwell time ($\langle \tau_{\text{dwell}} \rangle$) and escape rate ($R_{\text{escape}}$). Under physical Langevin dynamics, dwell time measures how stably the system occupies energy minima before thermal noise kicks it into an excited state, and escape rate directly measures transition frequency across energy barriers.
+**Answer**: The **physical ground-state escape rate range ($R_{\text{escape}} \approx 0.04\text{ – }0.12\text{ / }\mu\text{s}$)** and its implied Poisson mean lifetime ($\tau = 1/R_{\text{escape}} \approx 8.3\text{ – }25.0\text{ }\mu\text{s}$). Under physical Langevin dynamics, dwell time within a finite $1.0\text{ }\mu\text{s}$ window is right-censored at $1,000\text{ ns}$ when no escapes occur; reporting the escape rate range provides the true, uncensored measure of barrier crossing frequency.
 
 ---
 
@@ -404,23 +418,23 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 
 ### Q20: What are Total Variation Distance (TVD) and KL Divergence, and how do they quantify Boltzmann fidelity?
 **Answer**:
-- **Total Variation Distance**: $\text{TVD}(P, Q) = \frac{1}{2} \sum_s |P(s) - Q(s)| \in [0, 1]$. It represents the maximum difference in probability assigned to any subset of states. A TVD of $0.0480$ indicates a $95.2\%$ match between empirical and theoretical distributions.
+- **Total Variation Distance**: $\text{TVD}(P, Q) = \frac{1}{2} \sum_s |P(s) - Q(s)| \in [0, 1]$. It represents the maximum difference in probability assigned to any subset of states. A TVD of $0.0440$ indicates a $95.6\%$ match between empirical and theoretical distributions.
 - **Kullback-Leibler Divergence**: $D_{\text{KL}}(P \parallel Q) = \sum_s P(s) \ln \frac{P(s)}{Q(s)}$. It measures the information loss (in nats) when approximating distribution $P$ with model $Q$. A KL divergence $<0.03\text{ nats}$ demonstrates near-exact Boltzmann sampling in the active regime.
 
 ---
 
-### Q21: Are the 17,000+ ground-state departures real thermodynamic state escapes or output chatter? How do you distinguish them?
+### Q21: Are the 18,000+ ground-state departures real thermodynamic state escapes or output chatter? How do you distinguish them?
 **Answer**:
-They are overwhelmingly **output chatter / threshold jitter**. Analysis shows that $97.7\%$ of raw departures last $< 1.0\text{ ns}$ and $99.96\%$ last $< 2.0\text{ ns}$ (median duration $0.28\text{ ns}$). They occur when single 0.2 ns noise steps push the gate briefly across $V_{th}$, triggering the high-gain digital buffer before the circuit can physically relax into an excited state.
+They are overwhelmingly **output chatter / threshold jitter**. Analysis shows that $97.9\%$ of raw departures last $< 1.0\text{ ns}$ and $100.0\%$ last $< 2.0\text{ ns}$ (median duration $0.28\text{ ns}$). They occur when single 0.2 ns noise steps push the gate briefly across $V_{th}$, triggering the high-gain digital buffer before the circuit can physically relax into an excited state.
 - **Voltage hysteresis on $m_{\text{out}}$ fails** to filter this chatter because the digital buffer snaps rail-to-rail within $<100\text{ ps}$.
 - **Persistence filtering ($\Delta t \ge 2.0\text{ ns}$)**: Because the summing node RC relaxation time is $\tau \approx 1.88\text{ ns}$, a genuine thermodynamic escape requires the state to persist for $\ge 2.0\text{ ns}$.
-- **Filtered Result**: Filtering yields **7 real barrier escapes** across 50 runs ($0.14\text{ escapes}/\mu\text{s}$) with a true thermodynamic mean dwell time of **$892.6\text{ ns}$**, distinguishing macroscopic barrier transitions from micro-glitch jitter.
+- **Filtered Result**: Filtering yields **4 real barrier escapes** across 50 runs, giving an honest escape rate of **$0.04\text{ – }0.12\text{ / }\mu\text{s}$** and an implied uncensored Poisson mean lifetime of **$\tau \approx 8.3\text{ – }25.0\text{ }\mu\text{s}$** ($\hat{\tau} \approx 12.5\text{ }\mu\text{s}$), resolving the right-censoring limitation of the $1\text{ }\mu\text{s}$ observation window.
 
 ---
 
 ### Q22: Which states deviate most from the ideal Boltzmann distribution, and what physical hardware mechanism causes the discrepancy?
 **Answer**:
 The largest deviations occur in:
-1. `(-1, +1, -1, -1)` ($+1.47\%$ excess) and `(-1, -1, +1, -1)` ($+1.26\%$ excess) among 3/5-cut excited states.
-2. Mirror ground-state splitting: `(+1, -1, -1, +1)` ($43.3\%$) vs `(-1, +1, +1, -1)` ($40.8\%$).
-- **Mechanism**: Nodes $P_2$ and $P_3$ have degree 3, while $P_1$ and $P_4$ have degree 2. The higher parallel conductance at $P_2/P_3$ ($5G$ vs $4G$) attenuates the coupling voltage swing per edge by $20\%$. Consequently, excited configurations with isolated high spins on $P_2$ or $P_3$ experience weaker restoring fields than theoretical unweighted graph edges, elevating their residence time to ~3.3% compared to ~1.0% for low-degree excited states.
+1. `(-1, +1, -1, -1)` ($+1.44\%$ excess) and `(-1, -1, +1, -1)` ($+1.32\%$ excess) among 3/5-cut excited states.
+2. Mirror ground-state splitting: `(+1, -1, -1, +1)` ($42.8\%$) vs `(-1, +1, +1, -1)` ($41.2\%$).
+- **Mechanism**: Nodes $P_2$ and $P_3$ have degree 3, while $P_1$ and $P_4$ have degree 2. The higher parallel conductance at $P_2/P_3$ ($5G$ vs $4G$) attenuates the coupling voltage swing per edge by $20\%$. Consequently, excited configurations with isolated high spins on $P_2$ or $P_3$ experience weaker restoring fields than theoretical unweighted graph edges, elevating their residence time to ~3.4% compared to ~1.0% for low-degree excited states.
