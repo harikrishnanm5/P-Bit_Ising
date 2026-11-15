@@ -16,7 +16,7 @@ This document serves as an exhaustive, first-principles technical study guide fo
 3. [Operating Regimes: Freezing vs. Active Boltzmann Sampling](#3-operating-regimes-freezing-vs-active-boltzmann-sampling)
 4. [Convergence Dynamics: RC Settling vs. Stationary Langevin Diffusion](#4-convergence-dynamics-rc-settling-vs-stationary-langevin-diffusion)
    - [4.1 Why Initial Time-to-First-Ground-State is Misleading](#41-why-initial-time-to-first-ground-state-is-misleading)
-   - [4.2 Output Chatter vs. Physical Thermodynamic Dwell Time](#42-output-chatter-vs-physical-thermodynamic-dwell-time)
+   - [4.2 Output Chatter vs. Persistent State Changes (>= 2 ns)](#42-output-chatter-vs-persistent-state-changes--2-ns)
    - [4.3 Persistence Filtering vs. Voltage Hysteresis & Right-Censoring](#43-persistence-filtering-vs-voltage-hysteresis--right-censoring)
 5. [16-State Boltzmann Sampling Deviations & Degree Asymmetry](#5-16-state-boltzmann-sampling-deviations--degree-asymmetry)
 6. [22 High-Yield Technical Interview Questions & Answers](#6-22-high-yield-technical-interview-questions--answers)
@@ -33,7 +33,7 @@ In computing, we classify state variables into three distinct paradigms:
 
 $$P(m_i = +1) = \sigma(2 \beta I_i) = \frac{1}{1 + \exp\left(-\frac{2(I_i - V_{th})}{I_0}\right)}$$
 
-where $I_i$ is the synaptic input voltage arriving at the p-bit, $V_{th} \approx 0.94\text{ V}$ is the switching threshold, and $I_0 \approx 363.0\text{ mV}$ is the noise voltage scale measured across the balanced $R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega$ cell driven by calibrated $440\text{ mV}$ noise. A p-bit is thus a hardware building block that natively performs **Markov Chain Monte Carlo (MCMC)** and **Boltzmann sampling** in physical time without random number generation software overhead.
+where $I_i$ is the synaptic input voltage arriving at the p-bit, $V_{th} \approx 0.941\text{ V}$ is the switching threshold ($41\text{ mV}$ above the $0.90\text{ V}$ nominal bias point; $R_{fb}$ loading and inverter asymmetry are an untested hypothesis for this offset), and $I_0 \approx 363.0\text{ mV}$ is set by the noise amplitude as it appears at the gate node after the $R_{\text{in}} / R_{fb}$ network (measured across the balanced $R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega$ cell driven by calibrated $440\text{ mV}$ noise). A p-bit is thus a hardware building block that natively performs **Markov Chain Monte Carlo (MCMC)** and **Boltzmann sampling** in physical time without random number generation software overhead.
 
 ---
 
@@ -63,7 +63,7 @@ $$P(m = +1) = \int_{V_{th} - V_{\text{in}}}^{\infty} \frac{1}{\sqrt{2\pi}\sigma}
 
 $$\frac{1}{2} \left[1 + \text{erf}\left(\frac{x}{\sqrt{2}\sigma}\right)\right] \approx \frac{1}{1 + \exp\left(-\frac{2 x}{I_0}\right)}$$
 
-where $I_0 \approx \sqrt{2\pi}\sigma \approx 2.5 \sigma$. For our standardized cell with $440\text{ mV}$ RMS noise coupled through $R_{\text{in}} = 500\text{ k}\Omega$, empirical fitting yields $I_0 \approx 363.0\text{ mV}$ ($R^2 = 0.9941$).
+where $I_0$ is set by the noise amplitude as it appears at the gate node after the $R_{\text{in}} / R_{fb}$ network. For our standardized cell with $440\text{ mV}$ RMS noise coupled through $R_{\text{in}} = 500\text{ k}\Omega$ and $R_{fb} = 500\text{ k}\Omega$, empirical fitting yields $I_0 \approx 363.0\text{ mV}$ ($R^2 = 0.9941$). The fitted $V_{th} = 0.941\text{ V}$ is $41\text{ mV}$ above the $0.90\text{ V}$ nominal bias point; $R_{fb}$ loading and inverter asymmetry are an untested hypothesis for this offset.
 
 ---
 
@@ -183,7 +183,7 @@ Vnoise1 dither1 in1 DC 0 trnoise(440m 0.2n 0 0)
 Rin1 dither1 noise1 500k
 ```
 (Repeated for $P_1$ through $P_4$)
-- `Vbias1`: Sets the quiescent input at the mid-rail trip point $V_{th} = V_{DD}/2 = 0.90\text{ V}$.
+- `Vbias1`: Sets the quiescent input at the nominal mid-rail trip point $V_{th} = V_{DD}/2 = 0.90\text{ V}$.
 - `Vnoise1`: Independent Gaussian thermal noise source with $440\text{ mV}$ RMS amplitude updating every $0.2\text{ ns}$ ($5\text{ GHz}$ bandwidth). Explicit `DC 0` prevents Ngspice time-zero warnings.
 - `Rin1`: $500\text{ k}\Omega$ input summing resistor. It isolates the zero-impedance voltage source from gate node `noise1`, allowing passive linear superposition with feedback and coupling currents.
 
@@ -202,8 +202,8 @@ Cout1 m_out1 0 20fF
   - $W_p = 2.5\,\mu\text{m}$, $W_n = 1.0\,\mu\text{m}$ ($\frac{W_p}{W_n} = 2.5$).
   - $\beta_n = KP_n \cdot \frac{W_n}{L} = 150\mu \times \frac{1.0}{0.18} = 833.3\,\mu\text{A/V}^2$.
   - $\beta_p = KP_p \cdot \frac{W_p}{L} = 60\mu \times \frac{2.5}{0.18} = 833.3\,\mu\text{A/V}^2$.
-  - Because $\beta_n = \beta_p$, the inverter switching threshold is balanced at exactly $V_{DD}/2 = 0.900\text{ V}$.
-- `Rfb1` ($500\text{ k}\Omega$): DC negative feedback from `a1` to `noise1`, self-biasing the inverter at its trip point.
+  - Because $\beta_n = \beta_p$, the inverter switching threshold is balanced at $V_{DD}/2 = 0.900\text{ V}$.
+- `Rfb1` ($500\text{ k}\Omega$): DC negative feedback from `a1` to `noise1`, self-biasing the inverter near its trip point.
 - `C1` ($15\text{ fF}$): Dominant-pole integration capacitor setting the nodal RC relaxation time $\tau \approx 1.88\text{ ns}$.
 - `MP_BUF1` / `MN_BUF1`: Digital restoring inverter ($W_p = 3.0\mu, W_n = 1.5\mu$) isolating `a1` from load impedance and sharpening outputs into digital $0\text{ V} \leftrightarrow 1.8\text{ V}$.
 - `Cout1` ($20\text{ fF}$): Digital output load capacitance.
@@ -239,8 +239,9 @@ Noise Amplitude Spectrum:
   |-----------------------|------------------------|------------------------|
      Frozen Regime          Transition Region         Active Boltzmann         Thermal Overwhelm
    - GS > 99.9%           - Escapes appear           - 84.1% GS, 15.0% C3     - GS -> 12.5% (random)
-   - 0 escapes            - Dwell drops from us      - Real barrier escapes   - beta_eff -> 0
-   - Trivial match          to tens of ns            - Non-trivial TVD/KL     - Loss of optimization
+   - 0 escapes            - Dwell drops from us      - Persistent state       - beta_eff -> 0
+   - Trivial match          to tens of ns              changes (>= 2 ns)      - Loss of optimization
+                                                     - Non-trivial TVD/KL
 ```
 
 ### 1. Frozen Regime ($V_{\text{noise}} < 200\text{ mV}$)
@@ -269,7 +270,7 @@ When an excited state is forced using `.ic`:
 * The circuit switches into the ground state in **$<1.3\text{ ns}$**.
 * **This initial drop is purely linear RC circuit discharge and gate delay, NOT simulated annealing!**
 
-### 4.2 Output Chatter vs. Physical Thermodynamic Dwell Time
+### 4.2 Output Chatter vs. Persistent State Changes (>= 2 ns)
 In hardware measurements, counting every threshold crossing $V(m_{\text{out}}) = 0.90\text{ V}$ yields over 18,000 "escapes" per 50 runs. Detailed duration analysis of all 18,050 non-ground-state excursions reveals:
 * **$31.0\%$** last $< 0.2\text{ ns}$ (a single noise sample step).
 * **$97.9\%$** last $< 1.0\text{ ns}$.
@@ -279,21 +280,23 @@ These sub-nanosecond excursions are **output buffer chatter** caused by single h
 
 ### 4.3 Persistence Filtering vs. Voltage Hysteresis & Right-Censoring
 1. **Why Voltage Hysteresis Fails**: Because the restoring buffer is a high-gain CMOS inverter, even a 10 mV gate excursion causes $m_{\text{out}}$ to swing rail-to-rail (0V to 1.8V) within 50–100 ps. Testing hysteresis bands as wide as $0.20\text{ V} / 1.60\text{ V}$ on $m_{\text{out}}$ still leaves $>15,000$ trips.
-2. **The Physical Persistence Filter**: The physical summing node has an RC time constant $\tau \approx 1.88\text{ ns}$. A genuine thermodynamic escape requires the state to persist for $\Delta t \ge 2.0\text{ ns}$.
-3. **Right-Censored Dwell Time vs. Escape Rate Range**:
-   - In a $1.0\text{ }\mu\text{s}$ observation window, $>85\%$ of individual simulation runs experience **zero physical escapes**.
+2. **The Physical Persistence Filter**: The physical summing node has an RC time constant $\tau \approx 1.88\text{ ns}$. A genuine escape requires the state to persist for $\Delta t \ge 2.0\text{ ns}$.
+3. **Right-Censored Dwell Time vs. Escape Rate Interval**:
+   - In a $1.0\text{ }\mu\text{s}$ observation window, $>85\%$ of individual simulation runs experience **zero escapes**.
    - Consequently, the observed ground-state dwell segments are right-censored at $1,000\text{ ns}$ (the simulation end).
    - Averaging censored $1,000\text{ ns}$ runs produces an artificially truncated sample mean (~$900\text{ ns}$).
-   - **The honest, uncensored metric is the physical escape rate range**:
-     $$R_{\text{escape}} \approx \mathbf{0.04\text{ – }0.12\text{ / }\mu\text{s}} \quad (\text{mean: } 0.08\text{ / }\mu\text{s})$$
-   - Under Poisson Maximum Likelihood Estimation ($\hat{\tau} = 1/\hat{\lambda}$), the true physical mean state lifetime is:
-     $$\tau_{\text{true}} = \frac{1}{R_{\text{escape}}} \approx \mathbf{8.3\text{ – }25.0\text{ }\mu\text{s}} \quad (\text{mean: } 12.5\text{ }\mu\text{s})$$
+   - **The honest, uncensored metric is the escape rate**:
+     Reporting 4 events in $50\text{ }\mu\text{s}$ yields an escape rate of $\sim 0.08\text{ / }\mu\text{s}$ with an exact 95% Poisson interval of about $0.02\text{ to }0.2\text{ / }\mu\text{s}$ ($[0.022, 0.205]\text{ / }\mu\text{s}$).
+   - **Implied Mean Lifetime**:
+     Giving the implied mean lifetime as a range from that interval yields:
+     $$\tau_{\text{true}} \approx \mathbf{4.9\text{ – }45.9\text{ }\mu\text{s}} \quad (\text{central estimate: } 12.5\text{ }\mu\text{s})$$
+     and this lifetime is **extrapolated beyond the $1\text{ }\mu\text{s}$ window**.
 
 ---
 
 ## 5. 16-State Boltzmann Sampling Deviations & Degree Asymmetry
 
-In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution closely follows the theoretical Boltzmann distribution ($\text{TVD} = 0.0440$, $\text{KL} = 0.0219\text{ nats}$). The top deviating states are:
+In our benchmark $440\text{ mV}$ simulation ($N = 50$ runs), the measured 16-state distribution achieves a **reasonable fit with a single $\beta_{\text{eff}}$ (TVD 0.044), with systematic deviations attributed to node-degree asymmetry (not verified)** ($\text{TVD} = 0.0440$, $\text{KL} = 0.0219\text{ nats}$). The top deviating states are:
 1. `(-1, +1, -1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.44%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{+1.44\%}$)
 2. `(-1, -1, +1, -1)` (Cut = 3/5, $H = -1$): Empirical = **3.32%** vs. Boltzmann = **2.00%** ($\Delta = \mathbf{+1.32\%}$)
 3. `(+1, -1, -1, +1)` (Cut = 4/5, $H = -3$): Empirical = **42.83%** vs. Boltzmann = **41.83%** ($\Delta = \mathbf{+1.01\%}$)
@@ -322,7 +325,7 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 ---
 
 ### Q3: How does the Boltzmann sigmoid activation function mathematically emerge from circuit noise?
-**Answer**: An ideal inverter acts as a signum/Heaviside step function $f(V) = \text{sgn}(V - V_{th})$. Adding zero-mean Gaussian thermal noise $\xi \sim \mathcal{N}(0, \sigma^2)$ to input $V_{\text{in}}$ convolves the step function with the Gaussian probability density function. The output probability $P(m=+1) = \int_{V_{th}-V_{\text{in}}}^\infty \frac{1}{\sqrt{2\pi}\sigma} e^{-u^2/2\sigma^2} du = \frac{1}{2}[1 + \text{erf}(\frac{V_{\text{in}}-V_{th}}{\sqrt{2}\sigma})]$, which closely matches the logistic Boltzmann sigmoid $\frac{1}{1 + \exp(-2(V_{\text{in}}-V_{th})/I_0)}$ with $I_0 \approx \sqrt{2\pi}\sigma$.
+**Answer**: An ideal inverter acts as a signum/Heaviside step function $f(V) = \text{sgn}(V - V_{th})$. Adding zero-mean Gaussian thermal noise $\xi \sim \mathcal{N}(0, \sigma^2)$ to input $V_{\text{in}}$ convolves the step function with the Gaussian probability density function. The output probability $P(m=+1) = \int_{V_{th}-V_{\text{in}}}^\infty \frac{1}{\sqrt{2\pi}\sigma} e^{-u^2/2\sigma^2} du = \frac{1}{2}[1 + \text{erf}(\frac{V_{\text{in}}-V_{th}}{\sqrt{2}\sigma})]$, which closely matches the logistic Boltzmann sigmoid $\frac{1}{1 + \exp(-2(V_{\text{in}}-V_{th})/I_0)}$, where $I_0$ is set by the noise amplitude as it appears at the gate node after the $R_{\text{in}} / R_{fb}$ network (measured as $I_0 \approx 363.0\text{ mV}$ for the standardized core cell; the fitted $V_{th} = 0.941\text{ V}$ is $41\text{ mV}$ above the $0.90\text{ V}$ nominal bias point, with $R_{fb}$ loading and inverter asymmetry as an untested hypothesis for this offset).
 
 ---
 
@@ -350,7 +353,7 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 ---
 
 ### Q8: What metric actually reflects hardware sampling dynamics, and why?
-**Answer**: The **physical ground-state escape rate range ($R_{\text{escape}} \approx 0.04\text{ – }0.12\text{ / }\mu\text{s}$)** and its implied Poisson mean lifetime ($\tau = 1/R_{\text{escape}} \approx 8.3\text{ – }25.0\text{ }\mu\text{s}$). Under physical Langevin dynamics, dwell time within a finite $1.0\text{ }\mu\text{s}$ window is right-censored at $1,000\text{ ns}$ when no escapes occur; reporting the escape rate range provides the true, uncensored measure of barrier crossing frequency.
+**Answer**: The **escape rate of persistent state changes ($\ge 2\text{ ns}$)**: reporting 4 events in $50\text{ }\mu\text{s}$, rate $\sim 0.08\text{ / }\mu\text{s}$, with an exact 95% Poisson interval of about $0.02\text{ to }0.2\text{ / }\mu\text{s}$ ($[0.022, 0.205]\text{ / }\mu\text{s}$). Giving the implied mean lifetime as a range from that interval yields $4.9\text{ – }45.9\text{ }\mu\text{s}$ (central estimate $12.5\text{ }\mu\text{s}$), which is extrapolated beyond the $1\text{ }\mu\text{s}$ window. Under physical Langevin dynamics, dwell time within a finite $1.0\text{ }\mu\text{s}$ window is right-censored at $1,000\text{ ns}$ when no escapes occur; reporting the Poisson escape rate interval provides an honest, uncensored measure.
 
 ---
 
@@ -375,7 +378,7 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 ---
 
 ### Q13: What is the physical role of the feedback resistor $R_{fb}$ and capacitor $C_1$?
-**Answer**: $R_{fb} = 500\text{ k}\Omega$ provides negative DC feedback that self-biases the high-gain inverter at its trip point ($V_{th} = 0.90\text{ V}$). Capacitor $C_1 = 15\text{ fF}$ integrates the summing currents, establishing the dominant pole and internal relaxation time constant $\tau \approx R_{\text{eq}} C_1 \approx 1.88\text{ ns}$ that prevents gigahertz ring-oscillator instability.
+**Answer**: $R_{fb} = 500\text{ k}\Omega$ provides negative DC feedback that self-biases the high-gain inverter near its trip point ($V_{th} \approx 0.90\text{–}0.94\text{ V}$). Capacitor $C_1 = 15\text{ fF}$ integrates the summing currents, establishing the dominant pole and internal relaxation time constant $\tau \approx R_{\text{eq}} C_1 \approx 1.88\text{ ns}$ that prevents gigahertz ring-oscillator instability.
 
 ---
 
@@ -418,8 +421,8 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 
 ### Q20: What are Total Variation Distance (TVD) and KL Divergence, and how do they quantify Boltzmann fidelity?
 **Answer**:
-- **Total Variation Distance**: $\text{TVD}(P, Q) = \frac{1}{2} \sum_s |P(s) - Q(s)| \in [0, 1]$. It represents the maximum difference in probability assigned to any subset of states. A TVD of $0.0440$ indicates a $95.6\%$ match between empirical and theoretical distributions.
-- **Kullback-Leibler Divergence**: $D_{\text{KL}}(P \parallel Q) = \sum_s P(s) \ln \frac{P(s)}{Q(s)}$. It measures the information loss (in nats) when approximating distribution $P$ with model $Q$. A KL divergence $<0.03\text{ nats}$ demonstrates near-exact Boltzmann sampling in the active regime.
+- **Total Variation Distance**: $\text{TVD}(P, Q) = \frac{1}{2} \sum_s |P(s) - Q(s)| \in [0, 1]$. It represents the maximum difference in probability assigned to any subset of states. A TVD of $0.0440$ indicates a reasonable fit with a single $\beta_{\text{eff}}$ (TVD 0.044), with systematic deviations attributed to node-degree asymmetry (not verified).
+- **Kullback-Leibler Divergence**: $D_{\text{KL}}(P \parallel Q) = \sum_s P(s) \ln \frac{P(s)}{Q(s)}$. It measures the information loss (in nats) when approximating distribution $P$ with model $Q$.
 
 ---
 
@@ -427,8 +430,8 @@ In our benchmark 440 mV simulation ($N = 50$ runs), the empirical distribution c
 **Answer**:
 They are overwhelmingly **output chatter / threshold jitter**. Analysis shows that $97.9\%$ of raw departures last $< 1.0\text{ ns}$ and $100.0\%$ last $< 2.0\text{ ns}$ (median duration $0.28\text{ ns}$). They occur when single 0.2 ns noise steps push the gate briefly across $V_{th}$, triggering the high-gain digital buffer before the circuit can physically relax into an excited state.
 - **Voltage hysteresis on $m_{\text{out}}$ fails** to filter this chatter because the digital buffer snaps rail-to-rail within $<100\text{ ps}$.
-- **Persistence filtering ($\Delta t \ge 2.0\text{ ns}$)**: Because the summing node RC relaxation time is $\tau \approx 1.88\text{ ns}$, a genuine thermodynamic escape requires the state to persist for $\ge 2.0\text{ ns}$.
-- **Filtered Result**: Filtering yields **4 real barrier escapes** across 50 runs, giving an honest escape rate of **$0.04\text{ – }0.12\text{ / }\mu\text{s}$** and an implied uncensored Poisson mean lifetime of **$\tau \approx 8.3\text{ – }25.0\text{ }\mu\text{s}$** ($\hat{\tau} \approx 12.5\text{ }\mu\text{s}$), resolving the right-censoring limitation of the $1\text{ }\mu\text{s}$ observation window.
+- **Persistence filtering ($\Delta t \ge 2.0\text{ ns}$)**: Because the summing node RC relaxation time is $\tau \approx 1.88\text{ ns}$, a genuine escape requires the state to persist for $\ge 2.0\text{ ns}$.
+- **Filtered Result**: Filtering for persistent state changes ($\ge 2\text{ ns}$) yields **4 events in $50\text{ }\mu\text{s}$**, giving an escape rate of **$\sim 0.08\text{ / }\mu\text{s}$** with an exact 95% Poisson interval of about **$0.02\text{ to }0.2\text{ / }\mu\text{s}$** ($[0.022, 0.205]\text{ / }\mu\text{s}$). This gives an implied mean lifetime of **$4.9\text{ – }45.9\text{ }\mu\text{s}$** ($\hat{\tau} \approx 12.5\text{ }\mu\text{s}$), which is extrapolated beyond the $1\text{ }\mu\text{s}$ observation window, resolving the right-censoring limitation of the finite simulation window.
 
 ---
 

@@ -20,7 +20,7 @@ This repository provides complete, SPICE-accurate, transistor-level netlists, Ki
    - **4-p-Bit Mode (`V(MODE) = 1.8V`)**: Solves a 4-node, 5-edge benchmark graph ($K_4$ minus one edge).
    - **2-p-Bit Mode (`V(MODE) = 0.0V`)**: Disables edges to nodes P3 & P4 via CMOS transmission gates, isolating an antiferromagnetically coupled dimer pair ($P_1 \leftrightarrow P_2$).
 4. **Active Boltzmann Regime**: Systematic noise amplitude sweep ($50\text{ mV}$ to $500\text{ mV}$) establishing the operating point ($440\text{ mV}$ RMS) with non-trivial Boltzmann sampling (84.1% ground state, 15.2% excited state, active barrier crossing).
-5. **Escape Dynamics & Chatter Filtering**: Rigorous distinction between high-frequency threshold chatter (sub-nanosecond micro-glitches) and persistent thermodynamic barrier transitions ($\Delta t \ge 2\text{ ns}$), reporting the honest escape rate range.
+5. **Escape Dynamics & Chatter Filtering**: Rigorous distinction between high-frequency threshold chatter (sub-nanosecond micro-glitches) and persistent state changes ($\ge 2\text{ ns}$), reporting 4 events in $50\text{ }\mu\text{s}$, rate $\sim 0.08\text{ / }\mu\text{s}$, with an exact 95% Poisson interval.
 6. **Complete Educational Interview Guide ([`LEARNING.md`](LEARNING.md))**: Exhaustive study notes covering physics, derivations, line-by-line netlist walkthrough of [`spice/ising_4pbit_core.cir`](spice/ising_4pbit_core.cir), and 22 high-yield technical interview questions.
 
 ---
@@ -32,7 +32,7 @@ Each p-bit produces a stochastic digital output $m_i \in \{-1, +1\}$ whose proba
 
 $$P(m_i = +1) = \frac{1}{1 + \exp\left(-\frac{2 (I_i - V_{th})}{I_0}\right)} = \frac{1}{2}\left(1 + \tanh\left(\frac{I_i - V_{th}}{I_0}\right)\right)$$
 
-where $I_i$ is the synaptic input voltage arriving at the $i$-th p-bit summing node, $V_{th} \approx 0.94\text{ V}$ is the effective switching threshold, and $I_0 \approx 363.0\text{ mV}$ is the noise-scaling parameter measured directly from the standardized cell ($R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega, 440\text{ mV}$ noise). Note: $I_0$ scaled up from legacy unbuffered $14.4\text{ mV}$ because the standalone cell now includes the $500\text{ k}\Omega$ series input resistor and full $440\text{ mV}$ noise path identical to the master core.
+where $I_i$ is the synaptic input voltage arriving at the $i$-th p-bit summing node, $V_{th} \approx 0.941\text{ V}$ is the effective switching threshold ($41\text{ mV}$ above the $0.90\text{ V}$ nominal bias point; $R_{fb}$ loading and inverter asymmetry are an untested hypothesis for this offset), and $I_0 \approx 363.0\text{ mV}$ is set by the noise amplitude as it appears at the gate node after the $R_{\text{in}} / R_{fb}$ network (measured directly from the standardized cell with $R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega, 440\text{ mV}$ noise). Note: $I_0$ scaled up from legacy unbuffered $14.4\text{ mV}$ because the standalone cell now includes the $500\text{ k}\Omega$ series input resistor and full $440\text{ mV}$ noise path identical to the master core.
 
 ### 2. Ising Hamiltonian & MAX-CUT Mapping
 The network energy corresponds to the classical Ising spin Hamiltonian:
@@ -104,7 +104,7 @@ To identify the active sampling regime and prevent artificial freezing (where gr
 | **440 mV (Operating Point)** | **84.3%** | **14.9%** | **1.530** | **0.0442** | **0.0221 nats** | **17,931** | **Active Sampling** |
 | **500 mV** | 78.3% | 20.6% | 1.337 | 0.0555 | 0.0233 nats | 25,085 | High Noise |
 
-*\*Note: Raw escapes in this sweep table represent instantaneous threshold crossings (unfiltered chatter). For true physical barrier transitions ($\Delta t \ge 2\text{ ns}$), see Section 3.*
+*\*Note: Raw escapes in this sweep table represent instantaneous threshold crossings (unfiltered chatter). For persistent state changes ($\ge 2\text{ ns}$), see Section 3.*
 
 ---
 
@@ -120,7 +120,7 @@ Simulating $N = 50$ runs ($50\text{ }\mu\text{s}$ aggregate time, 2.5 million in
 * **3/5-Cut Excited States**: **15.23%** aggregate occupation across the 10 excited states.
 * **0/5 and 2/5 Low-Cut States**: **0.72%** aggregate occupation.
 * **Real Boltzmann Fit**: $\beta_{\text{eff}} = 1.521$ fitted strictly by minimizing KL divergence against $P(s) = e^{-\beta H(s)} / Z(\beta)$.
-* **Honest Statistical Distance Reporting**:
+* **Statistical Fit Assessment**: The measured distribution achieves a **reasonable fit with a single $\beta_{\text{eff}}$ (TVD 0.044), with systematic deviations attributed to node-degree asymmetry (not verified)**:
   - **Total Variation Distance (TVD)**: **0.0440 (4.40%)**.
   - **KL Divergence**: **0.0219 nats**.
 
@@ -152,30 +152,32 @@ Below is the complete rank-ordered deviation of all 16 states relative to the th
 
 ---
 
-### 3. Escape Dynamics: Real Barrier Transitions vs. High-Frequency Output Chatter
+### 3. Escape Dynamics: Persistent State Changes ($\ge 2\text{ ns}$) vs. High-Frequency Output Chatter
 
 Evaluating $N = 50$ runs initialized in excited states (`Cut < 4/5`):
 
 ![Convergence Analysis](results/convergence_analysis.png)
 
 #### Output Chatter Diagnosis:
-A critical physical question is whether the ~18,000 observed ground-state departures represent real thermodynamic state transitions or high-frequency digital buffer chatter:
+A critical physical question is whether the ~18,000 observed ground-state departures represent persistent state changes ($\ge 2\text{ ns}$) or high-frequency digital buffer chatter:
 * Analysis of all 18,050 non-ground-state excursions reveals that:
   - **$31.0\%$** last $< 0.2\text{ ns}$ (a single noise update step of `trnoise 0.2n`).
   - **$97.9\%$** last $< 1.0\text{ ns}$.
   - **$100.0\%$** last $< 2.0\text{ ns}$ (the median excursion duration is only **$0.28\text{ ns}$**).
-* **The Physical Persistence Filter ($\Delta t \ge 2.0\text{ ns}$)**: The physical summing node has an RC relaxation time constant $\tau \approx R_{\text{eq}} C_1 \approx 125\text{ k}\Omega \times 15\text{ fF} \approx 1.88\text{ ns}$. A true thermodynamic escape requires the circuit to cross the barrier and *persist* in the excited state long enough for the network to relax ($\Delta t \ge 2.0\text{ ns}$). Micro-glitches shorter than $2.0\text{ ns}$ represent high-frequency threshold chatter within the same ground-state dwell segment.
+* **The Physical Persistence Filter ($\Delta t \ge 2.0\text{ ns}$)**: The physical summing node has an RC relaxation time constant $\tau \approx R_{\text{eq}} C_1 \approx 125\text{ k}\Omega \times 15\text{ fF} \approx 1.88\text{ ns}$. A true escape requires the circuit to cross the barrier and result in persistent state changes ($\ge 2\text{ ns}$) long enough for the network to relax. Micro-glitches shorter than $2.0\text{ ns}$ represent high-frequency threshold chatter within the same ground-state dwell segment.
 
 #### Survival Analysis & Dwell Time Right-Censoring:
 In a $1.0\text{ }\mu\text{s}$ observation window, $>85\%$ of runs experience **zero escapes**, meaning the ground-state dwell duration is right-censored at $1,000\text{ ns}$. Averaging censored $1,000\text{ ns}$ segments produces an artificially truncated sample mean (~$900\text{ ns}$). 
-* The **honest, uncensored metric is the escape rate range ($R_{\text{escape}}$)**.
-* Under standard Poisson Maximum Likelihood Estimation ($\hat{\tau} = 1/\hat{\lambda}$), the true physical mean lifetime is $\tau \approx 12.5\text{ }\mu\text{s}$ (range: $8.3\text{ – }25.0\text{ }\mu\text{s}$).
+* **The honest, uncensored metric is the escape rate**: reporting 4 events in $50\text{ }\mu\text{s}$, rate $\sim 0.08\text{ / }\mu\text{s}$, with an exact 95% Poisson interval of about $0.02\text{ to }0.2\text{ / }\mu\text{s}$ ($[0.022, 0.205]\text{ / }\mu\text{s}$).
+* Giving the implied mean lifetime as a range from that interval yields:
+  $$\tau_{\text{true}} \approx \mathbf{4.9\text{ – }45.9\text{ }\mu\text{s}} \quad (\text{central estimate: } 12.5\text{ }\mu\text{s})$$
+  which is **extrapolated beyond the $1\text{ }\mu\text{s}$ window**.
 
 | Metric | Raw / Unfiltered (Instantaneous Threshold Crossing) | Filtered ($\Delta t \ge 2.0\text{ ns}$ Persistence) | Physical Interpretation |
 | :--- | :---: | :---: | :--- |
-| **Observed Escapes ($N=50$)** | **18,002** | **4** | 99.98% of raw exits are sub-2ns chatter |
-| **Escape Rate ($R_{\text{escape}}$)** | **$410.4\text{ / }\mu\text{s}$** | **$0.08\text{ / }\mu\text{s}$ (Range: $0.04\text{ – }0.12\text{ / }\mu\text{s}$)** | Thermodynamic barrier escape frequency |
-| **Implied Mean Lifetime ($\tau_{\text{true}}$)** | $0.002\text{ }\mu\text{s}$ ($2.4\text{ ns}$) | **$12.5\text{ }\mu\text{s}$ (Range: $8.3\text{ – }25.0\text{ }\mu\text{s}$)** | Uncensored Poisson state residence time |
+| **Observed Escapes ($N=50$, $50\,\mu\text{s}$ total)** | **18,002** | **4** | 99.98% of raw exits are sub-2ns chatter |
+| **Escape Rate ($R_{\text{escape}}$)** | **$410.4\text{ / }\mu\text{s}$** | **$\sim 0.08\text{ / }\mu\text{s}$ (Exact 95% Poisson CI: $0.02\text{ – }0.20\text{ / }\mu\text{s}$)** | Rate of persistent state changes ($\ge 2\text{ ns}$) |
+| **Implied Mean Lifetime ($\tau_{\text{true}}$)** | $0.002\text{ }\mu\text{s}$ ($2.4\text{ ns}$) | **$\sim 12.5\text{ }\mu\text{s}$ (Range: $4.9\text{ – }45.9\text{ }\mu\text{s}$)** | Extrapolated beyond 1 us window from Poisson interval |
 | **Time to First GS ($t_{\text{GS}}$)** | Median: **$0.200\text{ ns}$**, Max: **$1.29\text{ ns}$** | Median: **$0.200\text{ ns}$**, Max: **$1.29\text{ ns}$** | Driven by RC circuit discharge, NOT annealing |
 
 * **Important Architecture Note**: *There is NO anneal schedule in this circuit.* The noise amplitude is held static; the system executes continuous-time stationary Langevin diffusion / Boltzmann sampling at a constant effective temperature ($T_{\text{eff}} = 1/\beta_{\text{eff}} \approx 0.65$).
@@ -183,7 +185,7 @@ In a $1.0\text{ }\mu\text{s}$ observation window, $>85\%$ of runs experience **z
 ---
 
 ### 4. Waveforms & Single-Cell Characterization
-* **Single p-Bit Sigmoid ([`results/pbit_sigmoid_curve.png`](results/pbit_sigmoid_curve.png))**: Fitted $V_{th} = 0.941\text{ V}$, $I_0 = 363.0\text{ mV}$, $R^2 = 0.9941$. Rebuilt using the exact core cell ($R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega, 440\text{ mV}$ noise).
+* **Single p-Bit Sigmoid ([`results/pbit_sigmoid_curve.png`](results/pbit_sigmoid_curve.png))**: Fitted $V_{th} = 0.941\text{ V}$ ($41\text{ mV}$ above the $0.90\text{ V}$ bias point, with $R_{fb}$ loading and inverter asymmetry as an untested hypothesis), $I_0 = 363.0\text{ mV}$ (set by the noise amplitude as it appears at the gate node after the $R_{\text{in}} / R_{fb}$ network), $R^2 = 0.9941$. Rebuilt using the exact core cell ($R_{\text{in}} = 500\text{ k}\Omega, R_{fb} = 500\text{ k}\Omega, 440\text{ mV}$ noise).
 * **Coupled 2-p-Bit Pair ([`results/coupled_pair_transient.png`](results/coupled_pair_transient.png))**: **90.7% anti-correlated** toggling between `(+1, -1)` and `(-1, +1)`.
 * **4-p-Bit Transient ([`results/ising_4pbit_transient.png`](results/ising_4pbit_transient.png))**: Active dynamic toggling across $2.00\text{ }\mu\text{s}$ with **2,588 spin flips**, spending 84.0% in ground states and 15.2% in excited states.
 
@@ -272,17 +274,17 @@ python run_benchmarks.py
 | :--- | :--- | :--- |
 | **CMOS Technology** | 180nm Bulk CMOS | $L_{eff} = 180\text{ nm}$ (Level-1 SPICE models) |
 | **Supply Rail ($V_{DD}$)** | $1.8\text{ V}$ | Low-voltage operation |
-| **DC Bias Operating Point** | $0.90\text{ V}$ | Calibrated inverter switching threshold ($V_{th}$) |
+| **DC Bias Operating Point** | $0.90\text{ V}$ | Nominal inverter switching threshold ($V_{DD}/2$) |
 | **Input / Coupling / Feedback ($R_{\text{in}}, R_c, R_{fb}$)** | $500\text{ k}\Omega$ | Balanced resistive summing at each p-bit gate |
 | **Operating Thermal Noise** | $440\text{ mV}$ RMS @ $0.2\text{ ns}$ | Ngspice `trnoise()` in active Boltzmann sampling regime |
 | **Ground-State Residence** | $84.05\%$ ($N = 50$ runs) | Combined $4/5$ cut occupation at operating point |
-| **Excited-State Residence** | $15.23\%$ ($N = 50$ runs) | Active barrier crossings into 3/5-cut states |
-| **Distribution Fidelity** | $\text{TVD} = 0.0440$, $D_{\text{KL}} = 0.0219$ | Honest comparison against min-KL fitted $\beta_{\text{eff}} = 1.521$ |
-| **Single-Cell Sigmoid Fit** | $V_{th} = 0.941\text{ V}$, $I_0 = 363.0\text{ mV}$ | Measured with balanced $R_{\text{in}}=500\text{k}, R_{fb}=500\text{k}$ cell |
+| **Excited-State Residence** | $15.23\%$ ($N = 50$ runs) | Active sampling of 3/5-cut states |
+| **Boltzmann Distribution Fit** | $\text{TVD} = 0.0440$, $D_{\text{KL}} = 0.0219$ | Reasonable fit with a single $\beta_{\text{eff}} = 1.521$ (TVD 0.044), with systematic deviations attributed to node-degree asymmetry (not verified) |
+| **Single-Cell Sigmoid Fit** | $V_{th} = 0.941\text{ V}$, $I_0 = 363.0\text{ mV}$ | $V_{th}$ is $41\text{ mV}$ above $0.90\text{ V}$ bias ($R_{fb}$ loading & asymmetry untested hypothesis); $I_0$ set by noise at gate after $R_{\text{in}}/R_{fb}$ |
 | **Initial RC Settling Time** | $0.200\text{ ns}$ median ($1.29\text{ ns}$ max) | Initial electrical discharge from forced `.ic` |
 | **Raw Escape Rate (with Chatter)** | $410.4\text{ / }\mu\text{s}$ ($18,002$ trips) | Instantaneous threshold crossing ($97.9\% < 1\text{ ns}$) |
-| **Filtered Escape Rate ($\Delta t \ge 2\text{ ns}$)** | **$0.04\text{ – }0.12\text{ / }\mu\text{s}$** | True physical barrier transitions past RC relaxation |
-| **Implied Poisson Mean Lifetime** | **$8.3\text{ – }25.0\text{ }\mu\text{s}$** ($\hat{\tau} \approx 12.5\text{ }\mu\text{s}$) | Uncensored state residence duration ($1/\hat{\lambda}$) |
+| **Filtered Escape Rate ($\Delta t \ge 2\text{ ns}$)** | **$\sim 0.08\text{ / }\mu\text{s}$ (95% CI: $0.02\text{ – }0.20\text{ / }\mu\text{s}$)** | 4 events in $50\text{ }\mu\text{s}$; persistent state changes ($\ge 2\text{ ns}$) |
+| **Implied Poisson Mean Lifetime** | **$4.9\text{ – }45.9\text{ }\mu\text{s}$** ($\hat{\tau} \approx 12.5\text{ }\mu\text{s}$) | Implied range from exact 95% Poisson interval, extrapolated beyond 1 us window |
 
 ---
 
