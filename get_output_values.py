@@ -13,6 +13,7 @@ def compute_cut(spins):
 def get_4pbit_values():
     print("=" * 77)
     print("               4-p-BIT ISING CORE TRANSIENT OUTPUT VALUES")
+    print("           (Active Boltzmann Regime: 440mV RMS trnoise Noise)")
     print("=" * 77)
 
     repo_root = os.path.dirname(os.path.abspath(__file__))
@@ -27,9 +28,15 @@ def get_4pbit_values():
     tmp_cir = os.path.join(repo_root, "temp_sim.cir")
     tmp_txt = os.path.join(repo_root, "ising_results.txt")
 
-    sim_content = content.replace(
-        ".control",
-        f".control\n  run\n  wrdata {tmp_txt.replace(os.sep, '/')} v(m_out1) v(m_out2) v(m_out3) v(m_out4) v(a1) v(a2) v(a3) v(a4)\n  quit",
+    idx = content.rfind(".control")
+    sim_content = content[:idx] + (
+        f".control\n"
+        f"  set rndseed = 42\n"
+        f"  run\n"
+        f"  wrdata {tmp_txt.replace(os.sep, '/')} v(m_out1) v(m_out2) v(m_out3) v(m_out4) v(a1) v(a2) v(a3) v(a4)\n"
+        f"  quit\n"
+        f".endc\n"
+        f".end\n"
     )
 
     with open(tmp_cir, "w") as f:
@@ -43,25 +50,26 @@ def get_4pbit_values():
             return
 
         data = np.loadtxt(tmp_txt)
-        t_ms = data[:, 0] * 1e3
+        t_us = data[:, 0] * 1e6
         o1, o2, o3, o4 = data[:, 1], data[:, 3], data[:, 5], data[:, 7]
 
-        sample_points = [0.10, 0.25, 0.50, 0.75, 1.00]
+        t_max = t_us[-1]
+        sample_points = np.linspace(t_max * 0.1, t_max, 5)
 
         print(
-            f"{'Time (ms)':<10} | {'P1 (V)':<7} | {'P2 (V)':<7} | {'P3 (V)':<7} | {'P4 (V)':<7} | {'Spin Vector (s1,s2,s3,s4)':<22} | {'Cut'}"
+            f"{'Time (us)':<10} | {'P1 (V)':<7} | {'P2 (V)':<7} | {'P3 (V)':<7} | {'P4 (V)':<7} | {'Spin Vector (s1,s2,s3,s4)':<22} | {'Cut'}"
         )
         print("-" * 77)
 
         final_spins = None
         for sp in sample_points:
-            idx = int(np.argmin(np.abs(t_ms - sp)))
-            voltages = [o1[idx], o2[idx], o3[idx], o4[idx]]
+            idx_s = int(np.argmin(np.abs(t_us - sp)))
+            voltages = [o1[idx_s], o2[idx_s], o3[idx_s], o4[idx_s]]
             spins = tuple(1 if v > 0.9 else -1 for v in voltages)
             cut_cnt, _ = compute_cut(spins)
             spin_str = "(" + ", ".join(f"{s:+d}" for s in spins) + ")"
             print(
-                f"{t_ms[idx]:<10.2f} | {voltages[0]:<7.3f} | {voltages[1]:<7.3f} | {voltages[2]:<7.3f} | {voltages[3]:<7.3f} | {spin_str:<22} | {cut_cnt}/5"
+                f"{t_us[idx_s]:<10.2f} | {voltages[0]:<7.3f} | {voltages[1]:<7.3f} | {voltages[2]:<7.3f} | {voltages[3]:<7.3f} | {spin_str:<22} | {cut_cnt}/5"
             )
             final_spins = spins
 
@@ -75,11 +83,14 @@ def get_4pbit_values():
             axis=0,
         )
         gs_pct = 100.0 * float(np.mean(all_cuts == 4))
+        c3_pct = 100.0 * float(np.mean(all_cuts == 3))
+        flips = int(np.sum(np.any(all_spins[1:] != all_spins[:-1], axis=1)))
 
         print("-" * 77)
-        print(f"Final State at t = {t_ms[-1]:.2f} ms: s = {spin_str} ({'Ground State' if cut_cnt == 4 else 'Excited State'})")
+        print(f"Final State at t = {t_us[-1]:.2f} us: s = {spin_str} ({'Ground State' if cut_cnt == 4 else 'Excited State'})")
         print(f"Satisfied Cut Edges: {edges_str} [{cut_cnt} out of 5 edges cut]")
-        print(f"Ground-State Residence (Cut = 4/5 over 1.00 ms): {gs_pct:.1f}%\n")
+        print(f"Trajectory Summary: {flips} state transitions observed over {t_max:.2f} us")
+        print(f"Occupation: Ground State (Cut = 4/5) = {gs_pct:.1f}% | Excited (Cut = 3/5) = {c3_pct:.1f}%\n")
     finally:
         for tmp_file in [tmp_cir, tmp_txt]:
             if os.path.exists(tmp_file):

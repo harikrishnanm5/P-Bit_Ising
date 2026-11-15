@@ -1,5 +1,5 @@
-* 4-p-bit Ising Core
-.title 4-p-bit Ising Core
+* 4-p-bit Ising Core - 2-p-bit Mode Verification (MODE = 0.0V)
+.title 4-p-bit Ising Core Mode 2-p-bit
 
 Vdd vdd 0 DC 1.8V
 Vmode mode 0 DC 0.0V
@@ -15,10 +15,11 @@ Vbias2 in2 0 DC 0.90V
 Vbias3 in3 0 DC 0.90V
 Vbias4 in4 0 DC 0.90V
 
-Vnoise1 dither1 in1 SIN(0 600m 5.0k 0 0)
-Vnoise2 dither2 in2 SIN(0 600m 7.1k 0 0)
-Vnoise3 dither3 in3 SIN(0 600m 11.3k 0 0)
-Vnoise4 dither4 in4 SIN(0 600m 13.7k 0 0)
+* Real Independent Gaussian Thermal Noise Sources (440mV RMS)
+Vnoise1 dither1 in1 trnoise(440m 0.2n 0 0)
+Vnoise2 dither2 in2 trnoise(440m 0.2n 0 0)
+Vnoise3 dither3 in3 trnoise(440m 0.2n 0 0)
+Vnoise4 dither4 in4 trnoise(440m 0.2n 0 0)
 
 Rin1 dither1 noise1 500k
 Rin2 dither2 noise2 500k
@@ -61,7 +62,7 @@ MP_BUF4 m_out4 a4 vdd vdd PMOS_PBIT W=3.0u L=0.18u
 MN_BUF4 m_out4 a4 0   0   NMOS_PBIT W=1.5u L=0.18u
 Cout4 m_out4 0 20fF
 
-* Coupling (5 Edges)
+* Coupling (5 Edges, MODE=0 isolates P3 & P4)
 R_c12 a1 noise2 500k
 R_c21 a2 noise1 500k
 
@@ -93,9 +94,10 @@ R_c43 a4 tg_43 500k
 MN_TG43 tg_43 mode noise3 0 NMOS_PBIT W=1.0u L=0.18u
 MP_TG43 tg_43 mode_bar noise3 vdd PMOS_PBIT W=2.5u L=0.18u
 
-.tran 100n 1m
+.tran 0.5n 2u
 
 .control
+  set rndseed = 42
   run
   wrdata mode_2pbit.txt v(m_out1) v(m_out2) v(m_out3) v(m_out4)
   quit

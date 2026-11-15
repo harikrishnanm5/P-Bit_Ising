@@ -1,6 +1,7 @@
 * ==============================================================================
 * Step 6: Coupled 2-p-Bit Pair (Antiferromagnetic / Inhibitory Coupling)
 * Shows Correlated / Anti-Correlated Stochastic Toggling Between 2 Spins
+* Standardized 180nm CMOS with Ngspice trnoise() Thermal Noise Sources (440mV RMS)
 * ==============================================================================
 
 .title Coupled 2-p-Bit Stochastic Pair
@@ -12,10 +13,10 @@ Vdd vdd 0 DC 1.8V
 Vbias1 in1 0 DC 0.90V
 Vbias2 in2 0 DC 0.90V
 
-* Out-of-Phase Quasi-Random Dithering Sources (5.0kHz and 7.1kHz)
+* Real Independent Gaussian Thermal Noise Sources (440mV RMS)
 * Coupled via Rin = 500k so gates (n1, n2) act as true summing nodes
-Vdither1 d1 in1 SIN(0 500m 5.0k 0 0)
-Vdither2 d2 in2 SIN(0 500m 7.1k 0 0)
+Vdither1 d1 in1 trnoise(440m 0.2n 0 0)
+Vdither2 d2 in2 trnoise(440m 0.2n 0 0)
 Rin1 d1 n1 500k
 Rin2 d2 n2 500k
 
@@ -53,10 +54,11 @@ Cout2 m_out2 0 20fF
 R_c12 a1 n2 500k
 R_c21 a2 n1 500k
 
-* 1ms Transient Simulation
-.tran 100n 1m
+* 2us Transient Simulation
+.tran 0.5n 2u
 
 .control
+  set rndseed = 42
   run
   set color0=white
   set color1=black
